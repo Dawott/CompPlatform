@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Compliance_Platform")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b02fbb9ad3750d164220a659b83d0cebc091e432")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b4023384cfc005eb774a856df8b14d39f7921aa8")]
 [assembly: System.Reflection.AssemblyProductAttribute("Compliance_Platform")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Compliance_Platform")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
