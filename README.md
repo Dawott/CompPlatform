@@ -212,7 +212,7 @@ IDST-010
 
 **Wymagania:** 12
 
-**Warunki wstępne:**Istnieje wniosek ze statusem "Do weryfikacji"
+**Warunki wstępne:** Istnieje wniosek ze statusem "Do weryfikacji"
 
 **Kroki testowe:** 1. Zaloguj się jako audytor<br>2. Przejdź do listy wniosków do weryfikacji<br>3. Otwórz wybrany wniosek<br>4. Zmień status na "Zatwierdzony"<br>5. Sprawdź, czy system wysłał powiadomienie do rejestratora
 

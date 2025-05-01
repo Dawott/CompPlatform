@@ -1,4 +1,7 @@
 using Compliance_Platform.Components;
+using Compliance_Platform.Model;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -6,8 +9,28 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-var app = builder.Build();
 
+
+// SQL konektor
+var dbConnectionsString = builder.Configuration.GetConnectionString("CompPlatform");
+builder.Services.AddDbContext<CompPlatformDbContext>((options) =>
+{
+    options.UseSqlServer(dbConnectionsString);
+});
+
+//Fragment do obs³ugi kont
+builder.Services.AddDefaultIdentity<IdentityUser>(options => {
+    options.SignIn.RequireConfirmedAccount = false; // TBD
+    options.Password.RequireDigit = true;
+    options.Password.RequireLowercase = true;
+    options.Password.RequireUppercase = true;
+    options.Password.RequireNonAlphanumeric = true;
+    options.Password.RequiredLength = 8;
+})
+.AddRoles<IdentityRole>() // Wsparcie ról
+.AddEntityFrameworkStores<CompPlatformDbContext>();
+
+var app = builder.Build();
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
