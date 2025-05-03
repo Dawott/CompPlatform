@@ -1,0 +1,240 @@
+﻿@page "/risk-assessment/{InstanceId:int}"
+@using Compliance_Platform.Classes
+@using Compliance_Platform.Interfaces
+@using Compliance_Platform.Model
+@inject RiskCalculationService RiskService
+@inject IQuestionnaireRepository Repository
+
+<h3>Wyniki Oceny</h3>
+
+@if (instance == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <div class="risk-summary">
+        <h4>@instance.CompPlatformTool.Nazwa</h4>
+        <div class="risk-level @GetRiskLevelClass(instance.PoziomRyzyka)">
+            <h5>Poziom Ryzyka: @instance.PoziomRyzyka</h5>
+            <p>Całkowita kalkulacja ryzyka: @instance.KalkulacjaRyzyka.ToString("F2")</p>
+        </div>
+        
+        @if (categoryScores != null)
+        {
+            <h5>Podział Czynników Ryzyka</h5>
+            <div class="category-scores">
+                @foreach (var category in categoryScores.OrderByDescending(c => c.Value))
+                {
+                    <div class="category-item">
+                        <span class="category-name">@GetCategoryDisplayName(category.Key)</span>
+                        <div class="progress">
+                            <div class="progress-bar" 
+                                 style="width: @GetPercentage(category.Value)%"
+                                 role="progressbar" 
+                                 aria-valuenow="@category.Value" 
+                                 aria-valuemin="0" 
+                                 aria-valuemax="@GetMaxCategoryScore()">
+                                @category.Value.ToString("F1")
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        
+        <div class="compliance-recommendations">
+            <h5>Zalecenia Compliance</h5>
+            <ul>
+                @foreach (var recommendation in GetRecommendations())
+                {
+                    <li>@recommendation</li>
+                }
+            </ul>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int InstanceId { get; set; }
+
+    private CompPlatformInstance instance;
+    private Dictionary<string, decimal> categoryScores;
+    private List<string> complianceRecommendations = new List<string>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Ładuj instancje
+        instance = await Repository.GetInstanceAsync(InstanceId);
+
+        if (instance != null)
+        {
+            // Pobierz pytania
+            var answers = await Repository.GetInstanceAnswersAsync(instance.Id);
+
+            // Rekalkulacja ryzyka
+            var tool = await Repository.GetToolAsync(instance.ToolId);
+            var riskResult = RiskService.CalculateRisk(answers, tool);
+
+            // Pobierz wyniki kategorii
+            categoryScores = riskResult.CategoryScores;
+
+            // Generuj rekomendacje
+            GenerateRecommendations(answers, riskResult.Level);
+        }
+    }
+
+    private string GetRiskLevelClass(string riskLevel)
+    {
+        return riskLevel switch
+        {
+            "Ryzyko niskie" => "ryzyko-niskie",
+            "Ryzyko ograniczone" => "ryzyko-ograniczone",
+            "Wysokie ryzyko" => "ryzyko-wysokie",
+            "System Zakazany" => "zakazane",
+            _ => "inne"
+        };
+    }
+
+    private string GetCategoryDisplayName(string categoryKey)
+    {
+        // Mapowanie kategorii do UI
+        return categoryKey switch
+        {
+            "PrawaPodstawowe" => "Wpływ na Prawa Podstawowe",
+            "Bezpieczenstwo" => "Bezpieczeństwo i prywatność",
+            "Przejrzystosc" => "Przejrzystość i wyjaśnialność",
+            "NadzorLudzki" => "Mechanizmy nadzoru człowieka",
+            "DataGovernance" => "Jakość i zarządzanie danymi",
+            "OdpornoscTechniczna" => "Odporność cyfrowo-technologiczna",
+            "Inne" => "Pozostałe czynniki",
+            _ => categoryKey
+        };
+    }
+
+    private decimal GetMaxCategoryScore()
+    {
+        // Dopnij progress bar przy maksymalnej wartości
+        return categoryScores.Values.Max();
+    }
+
+    private double GetPercentage(decimal value)
+    {
+        // Kalkulacja do progress bara
+        decimal max = GetMaxCategoryScore();
+        return max > 0 ? (double)((value / max) * 100) : 0;
+    }
+
+    private void GenerateRecommendations(List<CompPlatformInstanceAnswer> answers, string riskLevel)
+    {
+        complianceRecommendations.Clear();
+
+        // Uogólnione rekomendacje nb poziomu ryzyka
+        switch (riskLevel)
+        {
+            case "Wysokie ryzyko":
+                complianceRecommendations.Add("Należy dokonać rewizji odpowiedniego poziomu bezpieczeństwa danych");
+                complianceRecommendations.Add("Pamiętaj o implementacji schematu zarządzania ryzykiem");
+                complianceRecommendations.Add("Zapewnij odpowiednie mechanizmy nadzoru ludzkiego");
+                complianceRecommendations.Add("Przygotuj odpowiednią dokumentację zgodną z wytycznymi");
+                break;
+            case "Ryzyko ograniczone":
+                complianceRecommendations.Add("Upewnij się, że notyfikacje o użyciu systemu AI są na miejscu");
+                complianceRecommendations.Add("Wdróż podstawowy monitoring");
+                complianceRecommendations.Add("Przygotuj i zachowaj dokumentację zgodnie z wytycznymi naszej organizacji");
+                break;
+            case "Ryzyko niskie":
+                complianceRecommendations.Add("Upewnij się, że notyfikacje o użyciu systemu AI są na miejscu");
+                complianceRecommendations.Add("Zadbaj o procedurę okresowego sprawdzania narzędzia");
+                break;
+            case "System Zakazany":
+                complianceRecommendations.Add("Niniejszego narzędzia nie można użyć lub rozpowszechniać w naszej organizacji");
+                complianceRecommendations.Add("Poczekaj na kontakt ze strony audytu lub skontaktuj się bezpośrednio");
+                break;
+        }
+
+        // Uogólnione rekomendacje nb kategorii
+        foreach (var category in categoryScores.Where(c => c.Value > 50))
+        {
+            switch (category.Key)
+            {
+                case "PrawaPodstawowe":
+                    complianceRecommendations.Add("Upewnij się, że system nie narusza praw dyskryminacyjnych");
+                    break;
+                case "Bezpieczenstwo":
+                    complianceRecommendations.Add("Zaimplementuj dodatkowe czujniki bezpieczeństwa");
+                    break;
+                case "Przejrzystosc":
+                    complianceRecommendations.Add("Zwróć uwagę, czy system pozwala na przejrzystość danych i algorytmów");
+                    break;
+                case "NadzorLudzki":
+                    complianceRecommendations.Add("Upewnij się, że nadzór i dokumentacja spełniają nasze wymagania");
+                    break;
+                case "DataGovernance":
+                    complianceRecommendations.Add("Sprawdź procedury zarządzania danymi");
+                    break;
+                case "OdpornoscTechniczna":
+                    complianceRecommendations.Add("Upewnij się, że system przeszedł audyt kodu");
+                    break;
+            }
+        }
+    }
+
+    private List<string> GetRecommendations()
+    {
+        return complianceRecommendations;
+    }
+}
+
+<style>
+    .risk-summary {
+        background-color: #f9f9f9;
+        padding: 20px;
+        border-radius: 8px;
+    }
+
+    .risk-level {
+        padding: 10px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+
+    .minimal-risk {
+        background-color: #d1e7dd;
+    }
+
+    .limited-risk {
+        background-color: #fff3cd;
+    }
+
+    .high-risk {
+        background-color: #f8d7da;
+    }
+
+    .unacceptable-risk {
+        background-color: #842029;
+        color: white;
+    }
+
+    .category-scores {
+        margin-bottom: 20px;
+    }
+
+    .category-item {
+        margin-bottom: 10px;
+    }
+
+    .category-name {
+        display: inline-block;
+        width: 200px;
+        font-weight: 500;
+    }
+
+    .progress {
+        display: inline-block;
+        width: calc(100% - 210px);
+        height: 20px;
+        vertical-align: middle;
+    }
+</style>
+

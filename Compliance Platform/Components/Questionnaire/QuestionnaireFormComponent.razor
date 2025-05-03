@@ -106,9 +106,10 @@
 
     private async Task HandleValidSubmit()
     {
+        var tool = await Repository.GetToolAsync(ToolId);
         // Kalkulacja ryzyka 
         var answers = State.CurrentAnswers.Values.ToList();
-        var (score, level) = RiskService.CalculateRisk(answers);
+        var (score, level, description, categoryScores) = RiskService.CalculateRisk(answers, tool);
 
         // Update instancji
         State.CurrentInstance.KalkulacjaRyzyka = score;
@@ -116,10 +117,10 @@
         State.CurrentInstance.Status = "Do weryfikacji";
         State.CurrentInstance.DataZlozenia = DateTime.Now;
 
-        // Save to database
+        // Zapis do bazy
         await Repository.SubmitInstanceAsync(State.CurrentInstance, answers);
 
-        // Show risk calculation
+        // Pokaż ryzyko
         showRiskCalculation = true;
     }
 
