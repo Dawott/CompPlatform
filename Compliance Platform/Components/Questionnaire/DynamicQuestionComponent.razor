@@ -1,0 +1,11 @@
+﻿@using Compliance_Platform.Model
+@code {
+    [Parameter]
+    public CompPlatformQuestions Question { get; set; }
+
+    [Parameter]
+    public CompPlatformInstanceAnswer Answer { get; set; }
+
+    [Parameter]
+    public EventCallback<CompPlatformInstanceAnswer> OnAnswerChanged { get; set; }
+}

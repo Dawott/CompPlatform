@@ -1,0 +1,158 @@
+﻿@using Compliance_Platform.Classes
+@using Compliance_Platform.Model
+@using Compliance_Platform.Interfaces
+@page "/questionnaire/{ToolId:int}/{QuestionnaireId:int}"
+@inject QuestionnaireService QuestionnaireService
+@inject QuestionnaireState State
+@inject RiskCalculationService RiskService
+@inject IQuestionnaireRepository Repository
+@inject IJSRuntime JSRuntime
+@implements IAsyncDisposable
+
+<h3>@QuestionnaireTemplate?.Nazwa</h3>
+
+<div class="progress-container">
+    <QuestionnaireNavigationComponent CurrentStep="@currentStep" TotalSteps="@questions.Count" />
+</div>
+
+<EditForm Model="@State.CurrentInstance" OnValidSubmit="@(async () => await HandleValidSubmit())">
+    <DataAnnotationsValidator />
+    @foreach (var question in questions)
+    {
+        <DynamicQuestionComponent 
+            Question="@question" 
+            Answer="@GetAnswerForQuestion(question.Id)"
+            OnAnswerChanged="@(answer => HandleAnswerChanged(question.Id, answer))" />
+    }
+    
+    <div class="button-container">
+        <button type="button" class="btn btn-secondary" @onclick="SaveDraft">
+            Zapisz jako draft
+        </button>
+        <button type="submit" class="btn btn-primary">
+            Wyślij do weryfikacji
+        </button>
+    </div>
+</EditForm>
+
+@if (showRiskCalculation)
+{
+    <div class="risk-calculation">
+        <h4>Kalkulacja ryzyka</h4>
+        <p>Poziom ryzyka: <strong>@State.CurrentInstance.PoziomRyzyka</strong></p>
+        <p>Punktacja: @State.CurrentInstance.KalkulacjaRyzyka</p>
+    </div>
+}
+
+
+@code {
+    [Parameter] public int ToolId { get; set; }
+    [Parameter] public int QuestionnaireId { get; set; }
+
+    private CompPlatformQuestionnaires QuestionnaireTemplate { get; set; }
+    private List<CompPlatformQuestions> questions = new();
+    private int currentStep = 1;
+    private bool showRiskCalculation = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Ładowanie templatki
+        QuestionnaireTemplate = await Repository.GetQuestionnaireAsync(QuestionnaireId);
+
+        // Wybór kategorii
+        var tool = await Repository.GetToolAsync(ToolId);
+
+        // Wybór pytań wg kategorii
+        questions = await QuestionnaireService.GetQuestionsForToolCategoryAsync(tool.Kategoria);
+
+        // Ładowanie draftu (jeśli istnieje)
+        var existingInstance = await Repository.GetInstanceDraftAsync(ToolId, QuestionnaireId);
+        if (existingInstance != null)
+        {
+            await State.LoadInstanceAsync(existingInstance);
+        }
+        else
+        {
+            await State.CreateNewInstanceAsync(ToolId, QuestionnaireId);
+        }
+    }
+
+    private CompPlatformInstanceAnswer GetAnswerForQuestion(int questionId)
+    {
+        if (State.CurrentAnswers.TryGetValue(questionId, out var answer))
+        {
+            return answer;
+        }
+
+        return new CompPlatformInstanceAnswer
+            {
+                QuestionTemplateId = questionId,
+                InstanceId = State.CurrentInstance.Id,
+                DataOdpowiedzi = DateTime.Now,
+                WnioskujacyId = "current-user-id" // TBD aktualny użytkownik
+            };
+    }
+
+    private void HandleAnswerChanged(int questionId, CompPlatformInstanceAnswer answer)
+    {
+        State.UpdateAnswer(questionId, answer.OdpowiedzTekst, answer.OpcjaOdpowiedziId, answer.WagaRyzykaPojedyncza);
+    }
+
+    private async Task SaveDraft()
+    {
+        await State.SaveDraftAsync(Repository);
+        // TBD pokazać potwierdzenie
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        // Kalkulacja ryzyka 
+        var answers = State.CurrentAnswers.Values.ToList();
+        var (score, level) = RiskService.CalculateRisk(answers);
+
+        // Update instancji
+        State.CurrentInstance.KalkulacjaRyzyka = score;
+        State.CurrentInstance.PoziomRyzyka = level;
+        State.CurrentInstance.Status = "Do weryfikacji";
+        State.CurrentInstance.DataZlozenia = DateTime.Now;
+
+        // Save to database
+        await Repository.SubmitInstanceAsync(State.CurrentInstance, answers);
+
+        // Show risk calculation
+        showRiskCalculation = true;
+    }
+
+    //Auto-save
+    private DotNetObjectReference<QuestionnaireFormComponent> objRef;
+    private const int AutoSaveIntervalMs = 120000; // 2 minuty
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            objRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("startAutoSaveTimer", objRef, AutoSaveIntervalMs);
+        }
+    }
+
+    [JSInvokable]
+    public async Task AutoSave()
+    {
+        if(State.IsDirty)
+        {
+            bool success = await State.SaveDraftAsync(Repository);
+            if (success)
+            {
+                // Notyfikacje
+                await JSRuntime.InvokeVoidAsync("showAutoSaveNotification");
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await JSRuntime.InvokeVoidAsync("clearAutoSaveTimer");
+        objRef?.Dispose();
+    }
+}

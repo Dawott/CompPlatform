@@ -7,6 +7,7 @@ namespace Compliance_Platform.Model
         public int Id { get; set; }
         public string Nazwa { get; set; }
         public string Opis { get; set; }
+        public string Kategoria { get; set; }
         public DateTime DataPowstania { get; set; }
         public string Status { get; set; }
 

@@ -37,7 +37,6 @@ Dawid Tott
 | 4a | Zapisanie draftu | Podczas edycji kwestionariusza jakikolwiek użytkownik na jakimkolwiek etapie może zapisać aktualną pracę bez wysłania do następnego statusu | Przydatne | Funkcjonalne |
 | 4b | Autozapis | Podczas edycji kwestionariusz zapisze się w wersji draft bez ingerencji użytkownika | Opcjonalne | Funkcjonalne |
 | 5 | Kalkulacja ryzyka | Po uzupełnieniu kwestionariusza użytkownik powinien widzieć oszacowane ryzyko | Wymagane | Funkcjonalne |
-| 5 | Kalkulacja ryzyka | Po uzupełnieniu kwestionariusza użytkownik powinien widzieć oszacowane ryzyko | Wymagane | Funkcjonalne |
 | 6 | Zdefiniowany przepływ statusów | Powinien istnieć zdefiniowany w konfiguracji przepływ statusów dla konkretnych ról | Wymagane | Funkcjonalne |
 | 7 | Baza danych | Wszystkie kwestionariusze powinny być zapisywane w bazie danych | Wymagane | Funkcjonalne |
 | 8a | Lista pytań | Podczas uzupełniania kwestionariusza powinna ładować się lista predefiniowanych pytań wraz z możliwymi odpowiedziami | Wymagane | Funkcjonalne |

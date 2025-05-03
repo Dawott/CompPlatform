@@ -1,5 +1,8 @@
+using Compliance_Platform.Classes;
 using Compliance_Platform.Components;
+using Compliance_Platform.Interfaces;
 using Compliance_Platform.Model;
+using Compliance_Platform.Repositories;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -29,6 +32,9 @@ builder.Services.AddDefaultIdentity<IdentityUser>(options => {
 })
 .AddRoles<IdentityRole>() // Wsparcie ról
 .AddEntityFrameworkStores<CompPlatformDbContext>();
+
+builder.Services.AddScoped<QuestionnaireState>();
+builder.Services.AddScoped<IQuestionnaireRepository, QuestionnaireRepository>();
 
 var app = builder.Build();
 // Configure the HTTP request pipeline.
