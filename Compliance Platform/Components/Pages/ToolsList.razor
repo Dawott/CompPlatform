@@ -1,0 +1,237 @@
+﻿@page "/tools"
+@using Compliance_Platform.Interfaces
+@using Compliance_Platform.Model
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IQuestionnaireRepository Repository
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Portfolio Narzędzi AI</PageTitle>
+
+<h1>Portfolio Narzędzi AI</h1>
+
+@if (isLoading)
+{
+    <div class="loading-container">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Ładowanie...</span>
+        </div>
+        <p>Ładowanie danych...</p>
+    </div>
+}
+else
+{
+    <div class="mb-3">
+        <div class="row">
+            <div class="col-md-6">
+                @if (isAuditor)
+                {
+                    <div class="form-group">
+                        <label for="statusFilter">Filtruj po statusie:</label>
+                        <select class="form-select" id="statusFilter" @bind="selectedStatus">
+                            <option value="">Wszystkie</option>
+                            <option value="Draft">Draft</option>
+                            <option value="Do weryfikacji">Do weryfikacji</option>
+                            <option value="Do poprawy">Do poprawy</option>
+                            <option value="Zatwierdzony">Zatwierdzony</option>
+                            <option value="Odrzucony">Odrzucony</option>
+                        </select>
+                    </div>
+                }
+            </div>
+            <div class="col-md-6 text-end">
+                <a href="/register-tool" class="btn btn-primary">Zarejestruj nowe narzędzie</a>
+            </div>
+        </div>
+    </div>
+
+    @if (!tools.Any())
+    {
+        <div class="alert alert-info">
+            Nie znaleziono żadnych narzędzi @(isAuditor ? "do przeglądu" : "zarejestrowanych przez Ciebie").
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table-striped table-hover table">
+                <thead>
+                    <tr>
+                        <th>Nazwa</th>
+                        <th>Kategoria</th>
+                        <th>Status</th>
+                        <th>Data utworzenia</th>
+                        @if (isAuditor)
+                        {
+                            <th>Właściciel</th>
+                        }
+                        <th>Poziom ryzyka</th>
+                        <th>Akcje</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var toolWithInstance in displayedTools)
+                    {
+                        <tr>
+                            <td>@toolWithInstance.Tool.Nazwa</td>
+                            <td>@toolWithInstance.Tool.Kategoria</td>
+                            <td>
+                                <span class="badge @GetStatusBadgeClass(toolWithInstance.LatestInstance?.Status)">
+                                    @(toolWithInstance.LatestInstance?.Status ?? "Brak kwestionariusza")
+                                </span>
+                            </td>
+                            <td>@toolWithInstance.Tool.DataPowstania.ToShortDateString()</td>
+                            @if (isAuditor)
+                            {
+                                <td>@(toolWithInstance.Tool.Wlasciciel?.Imie + " " + toolWithInstance.Tool.Wlasciciel?.Nazwisko)</td>
+                            }
+                            <td>
+                                <span class="badge @GetRiskBadgeClass(toolWithInstance.LatestInstance?.PoziomRyzyka)">
+                                    @(toolWithInstance.LatestInstance?.PoziomRyzyka ?? "Nieznane")
+                                </span>
+                            </td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    @if (toolWithInstance.LatestInstance != null)
+                                    {
+                                        <a href="/tool-details/@toolWithInstance.Tool.Id" class="btn btn-sm btn-info">Szczegóły</a>
+
+                                        @if (isAuditor && toolWithInstance.LatestInstance.Status == "Do weryfikacji")
+                                        {
+                                            <a href="/verify-tool/@toolWithInstance.LatestInstance.Id" class="btn btn-sm btn-warning">Weryfikuj</a>
+                                        }
+
+                                        @if (!isAuditor && toolWithInstance.LatestInstance.Status == "Draft")
+                                        {
+                                            <a href="/questionnaire/@toolWithInstance.Tool.Id/@toolWithInstance.LatestInstance.QuestionnaireId" class="btn btn-sm btn-primary">Kontynuuj</a>
+                                        }
+
+                                        @if (!isAuditor && toolWithInstance.LatestInstance.Status == "Do poprawy")
+                                        {
+                                            <a href="/questionnaire/@toolWithInstance.Tool.Id/@toolWithInstance.LatestInstance.QuestionnaireId" class="btn btn-sm btn-danger">Popraw</a>
+                                        }
+
+                                        @if (toolWithInstance.LatestInstance.Status == "Zatwierdzony")
+                                        {
+                                            <a href="/risk-assessment/@toolWithInstance.LatestInstance.Id" class="btn btn-sm btn-success">Ocena ryzyka</a>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <a href="/questionnaire-select/@toolWithInstance.Tool.Id" class="btn btn-sm btn-primary">Wypełnij kwestionariusz</a>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+
+@code {
+    private bool isLoading = true;
+    private bool isAuditor = false;
+    private string currentUserId;
+    private List<ToolWithInstance> tools = new();
+    private string selectedStatus = "";
+    private List<ToolWithInstance> displayedTools => FilterTools();
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+
+        // Pobierz użytkownika i rolę
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        // Sprawdź użytkownika
+        isAuditor = user.IsInRole("Audytor");
+        currentUserId = user.FindFirst(c => c.Type == "sub")?.Value;
+
+        // Załaduj bazując na roli
+        await LoadToolsAsync();
+
+        isLoading = false;
+    }
+
+    private async Task LoadToolsAsync()
+    {
+        tools.Clear();
+
+        if (isAuditor)
+        {
+            // Audytor = wszystko
+            var allTools = await Repository.GetAllToolsAsync();
+            foreach (var tool in allTools)
+            {
+                await AddToolWithLatestInstanceAsync(tool);
+            }
+        }
+        else
+        {
+            // Wnioskujący = własne
+            var myTools = await Repository.GetToolsByOwnerAsync(currentUserId);
+            foreach (var tool in myTools)
+            {
+                await AddToolWithLatestInstanceAsync(tool);
+            }
+        }
+    }
+
+    private async Task AddToolWithLatestInstanceAsync(CompPlatformTool tool)
+    {
+        var instances = await Repository.GetInstancesByToolAsync(tool.Id);
+        var latestInstance = instances.OrderByDescending(i => i.DataUtworzenia).FirstOrDefault();
+
+        tools.Add(new ToolWithInstance
+            {
+                Tool = tool,
+                LatestInstance = latestInstance
+            });
+    }
+
+    private List<ToolWithInstance> FilterTools()
+    {
+        if (string.IsNullOrEmpty(selectedStatus))
+        {
+            return tools;
+        }
+
+        return tools
+            .Where(t => t.LatestInstance != null && t.LatestInstance.Status == selectedStatus)
+            .ToList();
+    }
+
+    private string GetStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Draft" => "bg-secondary",
+            "Do weryfikacji" => "bg-primary",
+            "Do poprawy" => "bg-warning text-dark",
+            "Zatwierdzony" => "bg-success",
+            "Odrzucony" => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetRiskBadgeClass(string riskLevel)
+    {
+        return riskLevel switch
+        {
+            "Ryzyko niskie" => "bg-success",
+            "Ryzyko ograniczone" => "bg-warning text-dark",
+            "Wysokie ryzyko" => "bg-danger",
+            "System Zakazany" => "bg-dark",
+            _ => "bg-secondary"
+        };
+    }
+
+    private class ToolWithInstance
+    {
+        public CompPlatformTool Tool { get; set; }
+        public CompPlatformInstance LatestInstance { get; set; }
+    }
+}

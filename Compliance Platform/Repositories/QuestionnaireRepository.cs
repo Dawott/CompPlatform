@@ -41,6 +41,13 @@ namespace Compliance_Platform.Repositories
                 .ToListAsync();
         }
 
+        public async Task<List<CompPlatformTool>> GetAllToolsAsync()
+        {
+            return await _context.Tools
+                .Include(t => t.Wlasciciel)
+                .ToListAsync();
+        }
+
         public async Task<CompPlatformInstance> GetInstanceAsync(int instanceId)
         {
             return await _context.InstancesTool
