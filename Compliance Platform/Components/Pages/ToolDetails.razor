@@ -1,0 +1,267 @@
+﻿@page "/tool-details/{ToolId:int}"
+@using Compliance_Platform.Interfaces
+@using Compliance_Platform.Model
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IQuestionnaireRepository Repository
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Szczegóły narzędzia</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-container">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Ładowanie...</span>
+        </div>
+        <p>Ładowanie danych...</p>
+    </div>
+}
+else if (tool == null)
+{
+    <div class="alert alert-danger">
+        Nie znaleziono narzędzia o podanym ID.
+    </div>
+}
+else
+{
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h3>@tool.Nazwa</h3>
+            <span class="badge bg-primary">@tool.Kategoria</span>
+        </div>
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <h5>Informacje podstawowe</h5>
+                    <div class="mb-2">
+                        <strong>Data utworzenia:</strong> @tool.DataPowstania.ToShortDateString()
+                    </div>
+                    <div class="mb-2">
+                        <strong>Status:</strong> @tool.Status
+                    </div>
+                    <div class="mb-2">
+                        <strong>Właściciel:</strong> @(tool.Wlasciciel?.Imie + " " + tool.Wlasciciel?.Nazwisko)
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    @if (latestInstance != null)
+                    {
+                        <h5>Informacje o kwestionariuszu</h5>
+                        <div class="mb-2">
+                            <strong>Status kwestionariusza:</strong>
+                            <span class="badge @GetStatusBadgeClass(latestInstance.Status)">@latestInstance.Status</span>
+                        </div>
+                        <div class="mb-2">
+                            <strong>Data złożenia:</strong> @(latestInstance.DataZlozenia?.ToShortDateString() ?? "Nie złożono")
+                        </div>
+                        <div class="mb-2">
+                            <strong>Poziom ryzyka:</strong>
+                            <span class="badge @GetRiskBadgeClass(latestInstance.PoziomRyzyka)">@latestInstance.PoziomRyzyka</span>
+                        </div>
+                        @if (latestInstance.DataSprawdzenia.HasValue)
+                        {
+                            <div class="mb-2">
+                                <strong>Data sprawdzenia:</strong> @latestInstance.DataSprawdzenia.Value.ToShortDateString()
+                            </div>
+                            <div class="mb-2">
+                                <strong>Audytor:</strong> @(latestInstance.Audytor?.Imie + " " + latestInstance.Audytor?.Nazwisko)
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning">
+                            Brak wypełnionego kwestionariusza.
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="mt-2">
+                <h5>Opis</h5>
+                <p>@tool.Opis</p>
+            </div>
+
+            <div class="mt-4">
+                <h5>Historia kwestionariuszy</h5>
+                @if (!instances.Any())
+                {
+                    <div class="alert alert-info">
+                        Brak historii kwestionariuszy dla tego narzędzia.
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table-sm table">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Status</th>
+                                    <th>Poziom ryzyka</th>
+                                    <th>Wartość ryzyka</th>
+                                    <th>Akcje</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var instance in instances.OrderByDescending(i => i.DataUtworzenia))
+                                {
+                                    <tr>
+                                        <td>@instance.DataUtworzenia.ToShortDateString()</td>
+                                        <td>
+                                            <span class="badge @GetStatusBadgeClass(instance.Status)">@instance.Status</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge @GetRiskBadgeClass(instance.PoziomRyzyka)">@instance.PoziomRyzyka</span>
+                                        </td>
+                                        <td>@instance.KalkulacjaRyzyka.ToString("F2")</td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                @if (CanEditQuestionnaire(instance))
+                                                {
+                                                    <a href="/questionnaire/@tool.Id/@instance.QuestionnaireId" class="btn btn-sm btn-primary">Edytuj</a>
+                                                }
+                                                else
+                                                {
+                                                    <a href="/questionnaire-view/@instance.Id" class="btn btn-sm btn-info">Podgląd</a>
+                                                }
+
+                                                @if (instance.Status == "Zatwierdzony")
+                                                {
+                                                    <a href="/risk-assessment/@instance.Id" class="btn btn-sm btn-success">Ocena ryzyka</a>
+                                                }
+
+                                                @if (isAuditor && instance.Status == "Do weryfikacji")
+                                                {
+                                                    <a href="/verify-tool/@instance.Id" class="btn btn-sm btn-warning">Weryfikuj</a>
+                                                }
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+        <div class="card-footer">
+            <div class="d-flex justify-content-between">
+                <a href="/tools" class="btn btn-secondary">Powrót do listy</a>
+                <div>
+                    @if (latestInstance == null || (isToolOwner && CanCreateNewQuestionnaire()))
+                    {
+                        <a href="/questionnaire-select/@tool.Id" class="btn btn-primary">Wypełnij kwestionariusz</a>
+                    }
+                    @if (isAuditor && latestInstance?.Status == "Do weryfikacji")
+                    {
+                        <a href="/verify-tool/@latestInstance.Id" class="btn btn-warning">Zweryfikuj kwestionariusz</a>
+                    }
+                    @if (latestInstance?.Status == "Zatwierdzony")
+                    {
+                        <a href="/risk-assessment/@latestInstance.Id" class="btn btn-success">Przejdź do oceny ryzyka</a>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+
+@code {
+    [Parameter] public int ToolId { get; set; }
+
+    private bool isLoading = true;
+    private bool isAuditor = false;
+    private bool isToolOwner = false;
+    private string currentUserId;
+    private CompPlatformTool tool;
+    private CompPlatformInstance latestInstance;
+    private List<CompPlatformInstance> instances = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+
+        // Pobierz użytkownika i rolę
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        // Sprawdź użytkownika
+        isAuditor = user.IsInRole("Audytor");
+        currentUserId = user.FindFirst(c => c.Type == "sub")?.Value;
+
+        // Załaduj dane narzędzia
+        await LoadToolDataAsync();
+
+        isLoading = false;
+    }
+
+    private async Task LoadToolDataAsync()
+    {
+        // Pobierz narzędzie
+        tool = await Repository.GetToolAsync(ToolId);
+
+        if (tool != null)
+        {
+            // Sprawdź czy użytkownik jest właścicielem
+            isToolOwner = tool.OwnerId == currentUserId;
+
+            // Pobierz wszystkie instancje kwestionariuszy
+            instances = await Repository.GetInstancesByToolAsync(ToolId);
+
+            // Wybierz najnowszą instancję
+            latestInstance = instances.OrderByDescending(i => i.DataUtworzenia).FirstOrDefault();
+        }
+    }
+
+    private bool CanEditQuestionnaire(CompPlatformInstance instance)
+    {
+        // Właściciel może edytować tylko kwestionariusze w statusie Draft lub Do poprawy
+        if (isToolOwner && (instance.Status == "Draft" || instance.Status == "Do poprawy"))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool CanCreateNewQuestionnaire()
+    {
+        // Jeśli nie ma żadnej instancji, zawsze można utworzyć nową
+        if (latestInstance == null)
+            return true;
+
+        // Jeśli ostatnia instancja jest w statusie Zatwierdzony lub Odrzucony,
+        // można utworzyć nową wersję
+        return latestInstance.Status == "Zatwierdzony" || latestInstance.Status == "Odrzucony";
+    }
+
+    private string GetStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Draft" => "bg-secondary",
+            "Do weryfikacji" => "bg-primary",
+            "Do poprawy" => "bg-warning text-dark",
+            "Zatwierdzony" => "bg-success",
+            "Odrzucony" => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetRiskBadgeClass(string riskLevel)
+    {
+        return riskLevel switch
+        {
+            "Ryzyko niskie" => "bg-success",
+            "Ryzyko ograniczone" => "bg-warning text-dark",
+            "Wysokie ryzyko" => "bg-danger",
+            "System Zakazany" => "bg-dark",
+            _ => "bg-secondary"
+        };
+    }
+
+
+}

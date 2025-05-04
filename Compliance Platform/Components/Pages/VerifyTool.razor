@@ -1,0 +1,336 @@
+﻿@page "/verify-tool/{InstanceId:int}"
+@using Compliance_Platform.Classes
+@using Compliance_Platform.Model
+@using Compliance_Platform.Interfaces
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IQuestionnaireRepository Repository
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Weryfikacja kwestionariusza</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-container">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Ładowanie...</span>
+        </div>
+        <p>Ładowanie danych...</p>
+    </div>
+}
+else if (!isAuditor)
+{
+    <div class="alert alert-danger">
+        Brak uprawnień do weryfikacji kwestionariuszy.
+    </div>
+}
+else if (instance == null)
+{
+    <div class="alert alert-danger">
+        Nie znaleziono kwestionariusza o podanym ID.
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h3>Weryfikacja kwestionariusza: @questionnaire?.Nazwa</h3>
+            <span class="badge @GetStatusBadgeClass(instance.Status)">@instance.Status</span>
+        </div>
+        <div class="card-body">
+            <div class="mb-4">
+                <h5>Informacje o narzędziu</h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-2">
+                            <strong>Nazwa:</strong> @tool?.Nazwa
+                        </div>
+                        <div class="mb-2">
+                            <strong>Kategoria:</strong> @tool?.Kategoria
+                        </div>
+                        <div class="mb-2">
+                            <strong>Właściciel:</strong> @(tool?.Wlasciciel?.Imie + " " + tool?.Wlasciciel?.Nazwisko)
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-2">
+                            <strong>Data utworzenia:</strong> @instance.DataUtworzenia.ToShortDateString()
+                        </div>
+                        @if (instance.DataZlozenia.HasValue)
+                        {
+                            <div class="mb-2">
+                                <strong>Data złożenia:</strong> @instance.DataZlozenia.Value.ToShortDateString()
+                            </div>
+                        }
+                        <div class="mb-2">
+                            <strong>Poziom ryzyka:</strong>
+                            <span class="badge @GetRiskBadgeClass(instance.PoziomRyzyka)">@instance.PoziomRyzyka</span>
+                        </div>
+                        <div class="mb-2">
+                            <strong>Wartość ryzyka:</strong> @instance.KalkulacjaRyzyka.ToString("F2")
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <h5>Odpowiedzi</h5>
+                @if (questionAnswers?.Count > 0)
+                {
+                    @foreach (var qa in questionAnswers)
+                    {
+                        <div class="card mb-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>@qa.Question.Tresc</strong>
+                                    @if (qa.Question.Wymagane)
+                                    {
+                                        <span class="text-danger ms-1">*</span>
+                                    }
+                                </div>
+                                <div>
+                                    <span class="badge bg-info">
+                                        Kategoria: @GetCategoryDisplayName(qa.Question.Kategoria)
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                @if (!string.IsNullOrEmpty(qa.Answer.OdpowiedzTekst))
+                                {
+                                    <div class="mb-2">@qa.Answer.OdpowiedzTekst</div>
+                                }
+
+                                @if (qa.Answer.OpcjaOdpowiedziId.HasValue && qa.SelectedOption != null)
+                                {
+                                    <div class="mb-2">
+                                        <strong>Wybrana opcja:</strong> @qa.SelectedOption.Treść
+                                    </div>
+                                }
+
+                                <div class="small text-muted mt-2">
+                                    Waga ryzyka pytania: @qa.Question.WagaRyzyka.ToString("F2") |
+                                    Waga ryzyka odpowiedzi: @qa.Answer.WagaRyzykaPojedyncza.ToString("F2")
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="alert alert-info">
+                        Brak odpowiedzi w tym kwestionariuszu.
+                    </div>
+                }
+            </div>
+
+            <EditForm Model="@verificationModel" OnValidSubmit="HandleVerificationSubmit">
+                <DataAnnotationsValidator />
+
+                <div class="mb-3">
+                    <h5>Decyzja audytora</h5>
+                    <div class="form-group mb-3">
+                        <label for="status">Status:</label>
+                        <select class="form-select" id="status" @bind="verificationModel.NewStatus">
+                            <option value="Zatwierdzony">Zatwierdź</option>
+                            <option value="Do poprawy">Wymagana poprawa</option>
+                            <option value="Odrzucony">Odrzuć</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="comment">Komentarz:</label>
+                        <textarea class="form-control" id="comment" rows="4"
+                                  @bind="verificationModel.Comment"
+                                  placeholder="Dodaj komentarz dla wnioskującego..."></textarea>
+                    </div>
+                </div>
+
+                <div class="alert alert-info mt-3">
+                    <strong>Uwaga:</strong> Po zatwierdzeniu lub odrzuceniu, ten kwestionariusz nie będzie mógł być już zmieniony.
+                </div>
+
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="/tool-details/@instance.ToolId" class="btn btn-secondary">Powrót do szczegółów narzędzia</a>
+                    <button type="submit" class="btn @GetStatusButtonClass(verificationModel.NewStatus)">
+                        @GetStatusButtonText(verificationModel.NewStatus)
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+
+@code {
+    [Parameter] public int InstanceId { get; set; }
+
+    private bool isLoading = true;
+    private bool isAuditor = false;
+    private string currentUserId;
+    private CompPlatformInstance instance;
+    private CompPlatformTool tool;
+    private CompPlatformQuestionnaires questionnaire;
+    private List<QuestionAnswer> questionAnswers = new();
+    private VerificationModel verificationModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+
+        // Sprawdź uprawnienia
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        isAuditor = user.IsInRole("Audytor");
+        currentUserId = user.FindFirst(c => c.Type == "sub")?.Value;
+
+        if (isAuditor)
+        {
+            await LoadQuestionnaireDataAsync();
+        }
+
+        isLoading = false;
+    }
+
+    private async Task LoadQuestionnaireDataAsync()
+    {
+        // Pobierz instancję
+        instance = await Repository.GetInstanceAsync(InstanceId);
+
+        if (instance != null && instance.Status == "Do weryfikacji")
+        {
+            // Pobierz narzędzie
+            tool = await Repository.GetToolAsync(instance.ToolId);
+
+            // Pobierz szablon kwestionariusza
+            questionnaire = await Repository.GetQuestionnaireAsync(instance.QuestionnaireId);
+
+            // Pobierz odpowiedzi
+            var answers = await Repository.GetInstanceAnswersAsync(instance.Id);
+
+            // Pobierz pytania z kwestionariusza
+            var questions = await Repository.GetQuestionsByQuestionnaireAsync(instance.QuestionnaireId);
+
+            // Połącz pytania z odpowiedziami
+            foreach (var question in questions.OrderBy(q => q.OrderIndex))
+            {
+                var answer = answers.FirstOrDefault(a => a.QuestionTemplateId == question.Id);
+
+                if (answer != null)
+                {
+                    CompPlatformAnswers selectedOption = null;
+
+                    if (answer.OpcjaOdpowiedziId.HasValue)
+                    {
+                        selectedOption = question.Answers?
+                            .FirstOrDefault(o => o.Id == answer.OpcjaOdpowiedziId.Value);
+                    }
+
+                    questionAnswers.Add(new QuestionAnswer
+                        {
+                            Question = question,
+                            Answer = answer,
+                            SelectedOption = selectedOption
+                        });
+                }
+            }
+
+            // Ustaw domyślny status weryfikacji
+            verificationModel.NewStatus = "Zatwierdzony";
+        }
+    }
+
+    private async Task HandleVerificationSubmit()
+    {
+        if (instance != null && isAuditor)
+        {
+            bool success = await Repository.UpdateInstanceStatusAsync(
+                instance.Id,
+                verificationModel.NewStatus,
+                currentUserId,
+                verificationModel.Comment);
+
+            if (success)
+            {
+                // Przekieruj do szczegółów narzędzia
+                NavigationManager.NavigateTo($"/tool-details/{instance.ToolId}");
+            }
+        }
+    }
+
+    private string GetStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Draft" => "bg-secondary",
+            "Do weryfikacji" => "bg-primary",
+            "Do poprawy" => "bg-warning text-dark",
+            "Zatwierdzony" => "bg-success",
+            "Odrzucony" => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetRiskBadgeClass(string riskLevel)
+    {
+        return riskLevel switch
+        {
+            "Ryzyko niskie" => "bg-success",
+            "Ryzyko ograniczone" => "bg-warning text-dark",
+            "Wysokie ryzyko" => "bg-danger",
+            "System Zakazany" => "bg-dark",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetCategoryDisplayName(string categoryKey)
+    {
+        // Mapowanie kategorii do UI
+        return categoryKey switch
+        {
+            "PrawaPodstawowe" => "Prawa Podstawowe",
+            "Bezpieczenstwo" => "Bezpieczeństwo",
+            "Przejrzystosc" => "Przejrzystość",
+            "NadzorLudzki" => "Nadzór Ludzki",
+            "DataGovernance" => "Zarządzanie Danymi",
+            "OdpornoscTechniczna" => "Odporność Techniczna",
+            "Inne" => "Inne",
+            _ => categoryKey
+        };
+    }
+
+    private string GetStatusButtonClass(string status)
+    {
+        return status switch
+        {
+            "Zatwierdzony" => "btn-success",
+            "Do poprawy" => "btn-warning",
+            "Odrzucony" => "btn-danger",
+            _ => "btn-primary"
+        };
+    }
+
+    private string GetStatusButtonText(string status)
+    {
+        return status switch
+        {
+            "Zatwierdzony" => "Zatwierdź kwestionariusz",
+            "Do poprawy" => "Wyślij do poprawy",
+            "Odrzucony" => "Odrzuć kwestionariusz",
+            _ => "Zatwierdź"
+        };
+    }
+
+    private class QuestionAnswer
+    {
+        public CompPlatformQuestions Question { get; set; }
+        public CompPlatformInstanceAnswer Answer { get; set; }
+        public CompPlatformAnswers SelectedOption { get; set; }
+    }
+
+    private class VerificationModel
+    {
+        public string NewStatus { get; set; } = "Zatwierdzony";
+        public string Comment { get; set; } = "";
+    }
+}

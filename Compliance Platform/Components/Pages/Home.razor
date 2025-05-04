@@ -1,7 +1,345 @@
 ﻿@page "/"
+@using Compliance_Platform.Interfaces
+@using Compliance_Platform.Model
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IQuestionnaireRepository Repository
+@inject AuthenticationStateProvider AuthStateProvider
 
-<PageTitle>Home</PageTitle>
+<PageTitle>AI Act Compliance - Strona główna</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="row mb-4">
+    <div class="col">
+        <h1>Platforma Compliance AI Act</h1>
+        <p class="lead">
+            System zarządzania zgodnością narzędzi AI z regulacjami
+        </p>
+    </div>
+</div>
 
-Welcome to your new app.
+if (isLoading)
+{
+    <div class="loading-container">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Ładowanie...</span>
+        </div>
+        <p>Ładowanie danych...</p>
+    </div>
+}
+else
+{
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Portfolio narzędzi AI</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-column align-items-center">
+                        <h2 class="display-4">@toolsCount</h2>
+                        <p>narzędzi w rejestrze</p>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="/tools" class="btn btn-outline-primary w-100">Przejdź do listy</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">Weryfikacja</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-column align-items-center">
+                        <h2 class="display-4">@pendingCount</h2>
+                        <p>oczekujących wniosków</p>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    @if (isAuditor)
+                    {
+                        <a href="/tools?status=Do weryfikacji" class="btn btn-outline-warning w-100">Zweryfikuj wnioski</a>
+                    }
+                    else
+                    {
+                        <a href="/tools" class="btn btn-outline-warning w-100">Moje wnioski</a>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Zatwierdzone</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-column align-items-center">
+                        <h2 class="display-4">@approvedCount</h2>
+                        <p>zatwierdzonych narzędzi</p>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="/tools?status=Zatwierdzony" class="btn btn-outline-success w-100">Zobacz zatwierdzone</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Podsumowanie ryzyka narzędzi AI</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="risk-summary-item">
+                                <h6>Niskie ryzyko</h6>
+                                <div class="progress">
+                                    <div class="progress-bar bg-success" role="progressbar" style="width: @GetRiskPercentage("Ryzyko niskie")%" 
+                                         aria-valuenow="@GetRiskPercentage("Ryzyko niskie")" aria-valuemin="0" aria-valuemax="100">
+                                        @GetRiskCount("Ryzyko niskie")
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="risk-summary-item">
+                                <h6>Ograniczone ryzyko</h6>
+                                <div class="progress">
+                                    <div class="progress-bar bg-warning" role="progressbar" style="width: @GetRiskPercentage("Ryzyko ograniczone")%" 
+                                         aria-valuenow="@GetRiskPercentage("Ryzyko ograniczone")" aria-valuemin="0" aria-valuemax="100">
+                                        @GetRiskCount("Ryzyko ograniczone")
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6 mt-3">
+                            <div class="risk-summary-item">
+                                <h6>Wysokie ryzyko</h6>
+                                <div class="progress">
+                                    <div class="progress-bar bg-danger" role="progressbar" style="width: @GetRiskPercentage("Wysokie ryzyko")%" 
+                                         aria-valuenow="@GetRiskPercentage("Wysokie ryzyko")" aria-valuemin="0" aria-valuemax="100">
+                                        @GetRiskCount("Wysokie ryzyko")
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6 mt-3">
+                            <div class="risk-summary-item">
+                                <h6>Systemy zakazane</h6>
+                                <div class="progress">
+                                    <div class="progress-bar bg-dark" role="progressbar" style="width: @GetRiskPercentage("System Zakazany")%" 
+                                         aria-valuenow="@GetRiskPercentage("System Zakazany")" aria-valuemin="0" aria-valuemax="100">
+                                        @GetRiskCount("System Zakazany")
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Szybkie akcje</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-3">
+                        <a href="/register-tool" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i> Zarejestruj nowe narzędzie
+                        </a>
+                        
+                        @if (isAuditor)
+                        {
+                            <a href="/question-management" class="btn btn-secondary">
+                                <i class="bi bi-gear"></i> Zarządzaj pytaniami
+                            </a>
+                        }
+                        
+                        <a href="/tools" class="btn btn-outline-primary">
+                            <i class="bi bi-list-check"></i> Zarządzaj portfolio
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (recentTools.Any())
+    {
+        <div class="row">
+            <div class="col">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Ostatnio dodane narzędzia</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table-striped table-hover mb-0 table">
+                                <thead>
+                                    <tr>
+                                        <th>Nazwa</th>
+                                        <th>Kategoria</th>
+                                        <th>Status</th>
+                                        <th>Data</th>
+                                        <th>Akcje</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var tool in recentTools)
+                                    {
+                                        <tr>
+                                            <td>@tool.Nazwa</td>
+                                            <td>@tool.Kategoria</td>
+                                            <td>
+                                                <span class="badge @GetStatusBadgeClass(tool.Status)">@tool.Status</span>
+                                            </td>
+                                            <td>@tool.DataPowstania.ToShortDateString()</td>
+                                            <td>
+                                                <a href="/tool-details/@tool.Id" class="btn btn-sm btn-info">Szczegóły</a>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private bool isLoading = true;
+    private bool isAuditor = false;
+    private string currentUserId;
+
+    // Statystyki
+    private int toolsCount = 0;
+    private int pendingCount = 0;
+    private int approvedCount = 0;
+
+    // Dane ryzyka
+    private Dictionary<string, int> riskCounts = new();
+
+    // Lista ostatnich narzędzi
+    private List<CompPlatformTool> recentTools = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+
+        // Pobierz aktualnego użytkownika
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        isAuditor = user.IsInRole("Audytor");
+        currentUserId = user.FindFirst(c => c.Type == "sub")?.Value;
+
+        await LoadDashboardDataAsync();
+
+        isLoading = false;
+    }
+
+    private async Task LoadDashboardDataAsync()
+    {
+        // Inicjalizacja słownika z poziomami ryzyka
+        riskCounts = new Dictionary<string, int>
+        {
+            { "Ryzyko niskie", 0 },
+            { "Ryzyko ograniczone", 0 },
+            { "Wysokie ryzyko", 0 },
+            { "System Zakazany", 0 }
+        };
+
+        // Pobierz narzędzia
+        List<CompPlatformTool> tools;
+
+        if (isAuditor)
+        {
+            tools = await Repository.GetAllToolsAsync();
+        }
+        else
+        {
+            tools = await Repository.GetToolsByOwnerAsync(currentUserId);
+        }
+
+        toolsCount = tools.Count;
+
+        // Ostatnio dodane narzędzia (maksymalnie 5)
+        recentTools = tools
+            .OrderByDescending(t => t.DataPowstania)
+            .Take(5)
+            .ToList();
+        
+        // Pobierz dane o instancjach
+        var pendingInstances = await Repository.GetInstancesByStatusAsync("Do weryfikacji");
+        pendingCount = pendingInstances.Count;
+
+        var approvedInstances = await Repository.GetInstancesByStatusAsync("Zatwierdzony");
+        approvedCount = approvedInstances.Count;
+
+        // Obliczanie statystyk ryzyka
+        foreach (var instance in approvedInstances)
+        {
+            if (riskCounts.ContainsKey(instance.PoziomRyzyka))
+            {
+                riskCounts[instance.PoziomRyzyka]++;
+            }
+        }
+    }
+
+    private int GetRiskCount(string riskLevel)
+    {
+        return riskCounts.ContainsKey(riskLevel) ? riskCounts[riskLevel] : 0;
+    }
+
+    private int GetRiskPercentage(string riskLevel)
+    {
+        int count = GetRiskCount(riskLevel);
+        int total = riskCounts.Values.Sum();
+
+        return total > 0 ? (count * 100) / total : 0;
+    }
+
+    private string GetStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Draft" => "bg-secondary",
+            "Do weryfikacji" => "bg-primary",
+            "Do poprawy" => "bg-warning text-dark",
+            "Zatwierdzony" => "bg-success",
+            "Odrzucony" => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+}
+
+<style>
+    .risk-summary-item {
+        margin-bottom: 10px;
+    }
+
+    .progress {
+        height: 25px;
+    }
+
+    .progress-bar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        color: white;
+    }
+</style>

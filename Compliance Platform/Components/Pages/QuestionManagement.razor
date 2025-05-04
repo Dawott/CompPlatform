@@ -1,0 +1,564 @@
+﻿@page "/question-management"
+@using Compliance_Platform.Interfaces
+@using Compliance_Platform.Model
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IQuestionRepository QuestionRepository
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Zarządzanie pytaniami</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-container">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Ładowanie...</span>
+        </div>
+        <p>Ładowanie danych...</p>
+    </div>
+}
+else if (!isAuditor)
+{
+    <div class="alert alert-danger">
+        Brak uprawnień do zarządzania pytaniami.
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h3>Zarządzanie pytaniami kwestionariusza</h3>
+            <button class="btn btn-primary" @onclick="() => ShowQuestionModal(null)">
+                <i class="bi bi-plus-circle"></i> Dodaj nowe pytanie
+            </button>
+        </div>
+        <div class="card-body">
+            <div class="mb-3">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="categoryFilter">Filtruj po kategorii:</label>
+                            <select class="form-select" id="categoryFilter" @bind="selectedCategory">
+                                <option value="">Wszystkie kategorie</option>
+                                <option value="PrawaPodstawowe">Prawa podstawowe</option>
+                                <option value="Bezpieczenstwo">Bezpieczeństwo</option>
+                                <option value="Przejrzystosc">Przejrzystość</option>
+                                <option value="NadzorLudzki">Nadzór ludzki</option>
+                                <option value="DataGovernance">Zarządzanie danymi</option>
+                                <option value="OdpornoscTechniczna">Odporność techniczna</option>
+                                <option value="Inne">Inne</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="typeFilter">Filtruj po typie pytania:</label>
+                            <select class="form-select" id="typeFilter" @bind="selectedType">
+                                <option value="">Wszystkie typy</option>
+                                <option value="Tak/Nie">Tak/Nie</option>
+                                <option value="Multichoice">Wybór wielokrotny</option>
+                                <option value="Text">Pole tekstowe</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @if (!filteredQuestions.Any())
+            {
+                <div class="alert alert-info">
+                    Nie znaleziono pytań spełniających kryteria.
+                </div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table-striped table-hover table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Treść pytania</th>
+                                <th>Kategoria</th>
+                                <th>Typ</th>
+                                <th>Waga ryzyka</th>
+                                <th>Wymagane</th>
+                                <th>Akcje</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var question in filteredQuestions)
+                            {
+                                <tr>
+                                    <td>@question.OrderIndex</td>
+                                    <td>@(question.Tresc?.Length > 50 ? question.Tresc?.Substring(0, 47) + "..." : question.Tresc)</td>
+                                    <td>@GetCategoryDisplayName(question.Kategoria)</td>
+                                    <td>@question.TypPytania</td>
+                                    <td>@question.WagaRyzyka.ToString("F2")</td>
+                                    <td>
+                                        @if (question.Wymagane)
+                                        {
+                                            <span class="badge bg-success">Tak</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Nie</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <button class="btn btn-sm btn-info" @onclick="() => ShowQuestionModal(question)">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-danger" @onclick="() => ShowDeleteConfirmation(question)">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-success" @onclick="() => ShowAnswersModal(question)">
+                                                <i class="bi bi-list-check"></i> Odpowiedzi
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+    @if (showQuestionModal)
+    {
+        <div class="modal fade show" style="display:block;" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">@(editingQuestion.Id > 0 ? "Edycja pytania" : "Nowe pytanie")</h5>
+                        <button type="button" class="btn-close" @onclick="CloseQuestionModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <EditForm Model="@editingQuestion" OnValidSubmit="SaveQuestion">
+                            <DataAnnotationsValidator />
+
+                            <div class="form-group mb-3">
+                                <label for="questionText">Treść pytania:</label>
+                                <InputTextArea id="questionText" class="form-control" @bind-Value="editingQuestion.Tresc" rows="3" />
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="questionCategory">Kategoria:</label>
+                                        <InputSelect id="questionCategory" class="form-select" @bind-Value="editingQuestion.Kategoria">
+                                            <option value="PrawaPodstawowe">Prawa podstawowe</option>
+                                            <option value="Bezpieczenstwo">Bezpieczeństwo</option>
+                                            <option value="Przejrzystosc">Przejrzystość</option>
+                                            <option value="NadzorLudzki">Nadzór ludzki</option>
+                                            <option value="DataGovernance">Zarządzanie danymi</option>
+                                            <option value="OdpornoscTechniczna">Odporność techniczna</option>
+                                            <option value="Inne">Inne</option>
+                                        </InputSelect>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="questionType">Typ pytania:</label>
+                                        <InputSelect id="questionType" class="form-select" @bind-Value="editingQuestion.TypPytania">
+                                            <option value="Tak/Nie">Tak/Nie</option>
+                                            <option value="Multichoice">Wybór wielokrotny</option>
+                                            <option value="Text">Pole tekstowe</option>
+                                        </InputSelect>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="questionOrder">Kolejność:</label>
+                                        <InputNumber id="questionOrder" class="form-control" @bind-Value="editingQuestion.OrderIndex" />
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="questionRisk">Waga ryzyka:</label>
+                                        <InputNumber id="questionRisk" class="form-control" @bind-Value="editingQuestion.WagaRyzyka" step="0.1" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-check mb-3">
+                                <InputCheckbox id="questionRequired" class="form-check-input" @bind-Value="editingQuestion.Wymagane" />
+                                <label class="form-check-label" for="questionRequired">
+                                    Pytanie wymagane
+                                </label>
+                            </div>
+
+                            <div class="form-group mb-3">
+                                <label for="questionnaireId">Przypisz do kwestionariusza:</label>
+                                <InputNumber id="questionnaireId" class="form-control" @bind-Value="editingQuestion.QuestionnaireId" />
+                                <small class="text-muted">ID kwestionariusza, do którego pytanie będzie przypisane</small>
+                            </div>
+
+                            <div class="text-end">
+                                <button type="button" class="btn btn-secondary me-2" @onclick="CloseQuestionModal">Anuluj</button>
+                                <button type="submit" class="btn btn-primary">Zapisz</button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop fade show"></div>
+    }
+
+    @if (showAnswersModal)
+    {
+        <div class="modal fade show" style="display:block;" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Odpowiedzi dla pytania: @currentQuestion?.Tresc</h5>
+                        <button type="button" class="btn-close" @onclick="CloseAnswersModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if (currentQuestion.TypPytania == "Text")
+                        {
+                            <div class="alert alert-info">
+                                Pytania tekstowe nie mają predefiniowanych odpowiedzi.
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="mb-3 text-end">
+                                <button class="btn btn-sm btn-primary" @onclick="AddNewAnswer">
+                                    <i class="bi bi-plus-circle"></i> Dodaj odpowiedź
+                                </button>
+                            </div>
+
+                            @if (!answers.Any())
+                            {
+                                <div class="alert alert-warning">
+                                    Brak zdefiniowanych odpowiedzi dla tego pytania.
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="table-responsive">
+                                    <table class="table-sm table">
+                                        <thead>
+                                            <tr>
+                                                <th>#</th>
+                                                <th>Treść odpowiedzi</th>
+                                                <th>Waga ryzyka</th>
+                                                <th>Akcje</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var answer in answers.OrderBy(a => a.OrderIndex))
+                                            {
+                                                <tr>
+                                                    <td>@answer.OrderIndex</td>
+                                                    <td>
+                                                        @if (editingAnswerId == answer.Id)
+                                                        {
+                                                            <input type="text" class="form-control form-control-sm" @bind="answer.Treść" />
+                                                        }
+                                                        else
+                                                        {
+                                                            @answer.Treść
+                                                        }
+                                                    </td>
+                                                    <td>
+                                                        @if (editingAnswerId == answer.Id)
+                                                        {
+                                                            <input type="number" class="form-control form-control-sm" @bind="answer.WagaRyzyka" step="0.1" />
+                                                        }
+                                                        else
+                                                        {
+                                                            @answer.WagaRyzyka.ToString("F2")
+                                                        }
+                                                    </td>
+                                                    <td>
+                                                        @if (editingAnswerId == answer.Id)
+                                                        {
+                                                            <button class="btn btn-sm btn-success me-1" @onclick="() => SaveAnswer(answer)">
+                                                                <i class="bi bi-check"></i>
+                                                            </button>
+                                                            <button class="btn btn-sm btn-secondary" @onclick="CancelEditAnswer">
+                                                                <i class="bi bi-x"></i>
+                                                            </button>
+                                                        }
+                                                        else
+                                                        {
+                                                            <button class="btn btn-sm btn-info me-1" @onclick="() => EditAnswer(answer.Id)">
+                                                                <i class="bi bi-pencil"></i>
+                                                            </button>
+                                                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteAnswer(answer.Id)">
+                                                                <i class="bi bi-trash"></i>
+                                                            </button>
+                                                        }
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        }
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseAnswersModal">Zamknij</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop fade show"></div>
+    }
+
+    @if (showDeleteConfirmation)
+    {
+        <div class="modal fade show" style="display:block;" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Potwierdzenie usunięcia</h5>
+                        <button type="button" class="btn-close" @onclick="CloseDeleteConfirmation"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Czy na pewno chcesz usunąć pytanie: <strong>@currentQuestion?.Tresc</strong>?</p>
+                        <p class="text-danger">Uwaga: Ta operacja jest nieodwracalna!</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseDeleteConfirmation">Anuluj</button>
+                        <button type="button" class="btn btn-danger" @onclick="ConfirmDeleteQuestion">Usuń</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop fade show"></div>
+    }
+}
+
+@code {
+    private bool isLoading = true;
+    private bool isAuditor = false;
+    private List<CompPlatformQuestions> questions = new();
+    private List<CompPlatformAnswers> answers = new();
+
+    // Filtry
+    private string selectedCategory = "";
+    private string selectedType = "";
+
+    // Edycja pytania
+    private bool showQuestionModal = false;
+    private CompPlatformQuestions editingQuestion = new();
+
+    // Odpowiedzi
+    private bool showAnswersModal = false;
+    private CompPlatformQuestions currentQuestion;
+    private int editingAnswerId = 0;
+
+    // Usuwanie
+    private bool showDeleteConfirmation = false;
+
+    // Filtrowane pytania
+    private List<CompPlatformQuestions> filteredQuestions => questions
+        .Where(q => string.IsNullOrEmpty(selectedCategory) || q.Kategoria == selectedCategory)
+        .Where(q => string.IsNullOrEmpty(selectedType) || q.TypPytania == selectedType)
+        .OrderBy(q => q.OrderIndex)
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+
+        // Sprawdź uprawnienia
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        isAuditor = user.IsInRole("Audytor");
+
+        if (isAuditor)
+        {
+            // Pobierz wszystkie pytania
+            questions = await QuestionRepository.GetAllQuestionsAsync();
+        }
+
+        isLoading = false;
+    }
+
+    private void ShowQuestionModal(CompPlatformQuestions question)
+    {
+        if (question == null)
+        {
+            // Nowe pytanie
+            editingQuestion = new CompPlatformQuestions
+                {
+                    TypPytania = "Tak/Nie",
+                    Kategoria = "Inne",
+                    OrderIndex = questions.Count > 0 ? questions.Max(q => q.OrderIndex) + 1 : 1,
+                    WagaRyzyka = 1.0m,
+                    Wymagane = true,
+                    QuestionnaireId = 1 // Domyślny kwestionariusz
+                };
+        }
+        else
+        {
+            // Edycja istniejącego pytania
+            editingQuestion = new CompPlatformQuestions
+                {
+                    Id = question.Id,
+                    Tresc = question.Tresc,
+                    TypPytania = question.TypPytania,
+                    Kategoria = question.Kategoria,
+                    OrderIndex = question.OrderIndex,
+                    WagaRyzyka = question.WagaRyzyka,
+                    Wymagane = question.Wymagane,
+                    QuestionnaireId = question.QuestionnaireId
+                };
+        }
+
+        showQuestionModal = true;
+    }
+
+    private void CloseQuestionModal()
+    {
+        showQuestionModal = false;
+    }
+
+    private async Task SaveQuestion()
+    {
+        if (editingQuestion.Id > 0)
+        {
+            // Aktualizuj istniejące pytanie
+            await QuestionRepository.UpdateQuestionAsync(editingQuestion);
+
+            // Aktualizuj lokalną listę
+            var index = questions.FindIndex(q => q.Id == editingQuestion.Id);
+            if (index >= 0)
+            {
+                questions[index] = editingQuestion;
+            }
+        }
+        else
+        {
+            // Dodaj nowe pytanie
+            int newId = await QuestionRepository.AddQuestionAsync(editingQuestion);
+            editingQuestion.Id = newId;
+
+            // Dodaj do lokalnej listy
+            questions.Add(editingQuestion);
+        }
+
+        showQuestionModal = false;
+    }
+
+    private async Task ShowAnswersModal(CompPlatformQuestions question)
+    {
+        currentQuestion = question;
+
+        // Pobierz odpowiedzi dla pytania
+        answers = await QuestionRepository.GetAnswersByQuestionIdAsync(question.Id);
+
+        showAnswersModal = true;
+    }
+
+    private void CloseAnswersModal()
+    {
+        showAnswersModal = false;
+        editingAnswerId = 0;
+    }
+
+    private void AddNewAnswer()
+    {
+        // Utwórz nową odpowiedź
+        var newAnswer = new CompPlatformAnswers
+            {
+                QuestionTemplateId = currentQuestion.Id,
+                Treść = "Nowa odpowiedź",
+                WagaRyzyka = 1.0m,
+                OrderIndex = answers.Count > 0 ? answers.Max(a => a.OrderIndex) + 1 : 1
+            };
+
+        // Rozpocznij edycję
+        answers.Add(newAnswer);
+        editingAnswerId = newAnswer.Id;
+    }
+
+    private void EditAnswer(int answerId)
+    {
+        editingAnswerId = answerId;
+    }
+
+    private void CancelEditAnswer()
+    {
+        editingAnswerId = 0;
+    }
+
+    private async Task SaveAnswer(CompPlatformAnswers answer)
+    {
+        if (answer.Id > 0)
+        {
+            // Aktualizuj istniejącą odpowiedź
+            await QuestionRepository.UpdateAnswerAsync(answer);
+        }
+        else
+        {
+            // Dodaj nową odpowiedź
+            int newId = await QuestionRepository.AddAnswerAsync(answer);
+            answer.Id = newId;
+        }
+
+        editingAnswerId = 0;
+    }
+
+    private async Task DeleteAnswer(int answerId)
+    {
+        await QuestionRepository.DeleteAnswerAsync(answerId);
+
+        // Usuń z lokalnej listy
+        answers.RemoveAll(a => a.Id == answerId);
+    }
+
+    private void ShowDeleteConfirmation(CompPlatformQuestions question)
+    {
+        currentQuestion = question;
+        showDeleteConfirmation = true;
+    }
+
+    private void CloseDeleteConfirmation()
+    {
+        showDeleteConfirmation = false;
+    }
+
+    private async Task ConfirmDeleteQuestion()
+    {
+        if (currentQuestion != null)
+        {
+            bool success = await QuestionRepository.DeleteQuestionAsync(currentQuestion.Id);
+
+            if (success)
+            {
+                // Usuń z lokalnej listy
+                questions.RemoveAll(q => q.Id == currentQuestion.Id);
+            }
+        }
+
+        showDeleteConfirmation = false;
+    }
+
+    private string GetCategoryDisplayName(string categoryKey)
+    {
+        // Mapowanie kategorii do UI
+        return categoryKey switch
+        {
+            "PrawaPodstawowe" => "Prawa Podstawowe",
+            "Bezpieczenstwo" => "Bezpieczeństwo",
+            "Przejrzystosc" => "Przejrzystość",
+            "NadzorLudzki" => "Nadzór Ludzki",
+            "DataGovernance" => "Zarządzanie Danymi",
+            "OdpornoscTechniczna" => "Odporność Techniczna",
+            "Inne" => "Inne",
+            _ => categoryKey
+        };
+    }
+}

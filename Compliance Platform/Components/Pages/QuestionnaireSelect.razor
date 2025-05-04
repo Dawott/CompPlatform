@@ -1,0 +1,98 @@
+﻿@page "/questionnaire-select/{ToolId:int}"
+@using Compliance_Platform.Model
+@using Compliance_Platform.Interfaces
+@inject IQuestionnaireRepository Repository
+@inject NavigationManager NavigationManager
+
+<PageTitle>Wybór Kwestionariusza</PageTitle>
+
+@if (isLoading)
+{
+    <div class="loading-container">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Ładowanie...</span>
+        </div>
+        <p>Ładowanie danych...</p>
+    </div>
+}
+else if (tool == null)
+{
+    <div class="alert alert-danger">
+        Nie znaleziono narzędzia o podanym ID.
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header">
+            <h3>Wybór kwestionariusza dla: @tool.Nazwa</h3>
+        </div>
+        <div class="card-body">
+            <p>Wybierz rodzaj kwestionariusza, który chcesz wypełnić dla tego narzędzia.</p>
+
+            @if (!activeQuestionnaires.Any())
+            {
+                <div class="alert alert-warning">
+                    Nie znaleziono aktywnych kwestionariuszy w systemie. Skontaktuj się z administratorem.
+                </div>
+            }
+            else
+            {
+                <div class="row">
+                    @foreach (var questionnaire in activeQuestionnaires)
+                    {
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-header">
+                                    <h5>@questionnaire.Nazwa</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p>@questionnaire.Opis</p>
+                                    <p class="small text-muted">Data utworzenia: @questionnaire.DataUtworzenia.ToShortDateString()</p>
+                                </div>
+                                <div class="card-footer">
+                                    <button class="btn btn-primary w-100" @onclick="() => SelectQuestionnaire(questionnaire.Id)">
+                                        Wybierz ten kwestionariusz
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+        <div class="card-footer">
+            <a href="/tool-details/@ToolId" class="btn btn-secondary">Powrót do szczegółów narzędzia</a>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int ToolId { get; set; }
+
+    private bool isLoading = true;
+    private CompPlatformTool tool;
+    private List<CompPlatformQuestionnaires> activeQuestionnaires = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+
+        // Pobierz narzędzie
+        tool = await Repository.GetToolAsync(ToolId);
+
+        if (tool != null)
+        {
+            // Pobierz aktywne kwestionariusze
+            activeQuestionnaires = await Repository.GetActiveQuestionnairesAsync();
+        }
+
+        isLoading = false;
+    }
+
+    private void SelectQuestionnaire(int questionnaireId)
+    {
+        // Przekierowanie do wypełniania kwestionariusza
+        NavigationManager.NavigateTo($"/questionnaire/{ToolId}/{questionnaireId}");
+    }
+}
