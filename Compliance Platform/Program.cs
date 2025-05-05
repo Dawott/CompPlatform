@@ -21,6 +21,8 @@ builder.Services.AddDbContext<CompPlatformDbContext>((options) =>
     options.UseSqlServer(dbConnectionsString);
 });
 
+builder.Services.AddTransient<IEmailService, EmailService>();
+
 //Fragment do obs³ugi kont
 builder.Services.AddDefaultIdentity<IdentityUser>(options => {
     options.SignIn.RequireConfirmedAccount = false; // TBD
@@ -33,8 +35,11 @@ builder.Services.AddDefaultIdentity<IdentityUser>(options => {
 .AddRoles<IdentityRole>() // Wsparcie ról
 .AddEntityFrameworkStores<CompPlatformDbContext>();
 
-builder.Services.AddScoped<QuestionnaireState>();
 builder.Services.AddScoped<IQuestionnaireRepository, QuestionnaireRepository>();
+builder.Services.AddScoped<IQuestionRepository, QuestionRepository>();
+builder.Services.AddScoped<QuestionnaireService>();
+builder.Services.AddScoped<QuestionnaireState>();
+builder.Services.AddScoped<RiskCalculationService>();
 
 var app = builder.Build();
 // Configure the HTTP request pipeline.

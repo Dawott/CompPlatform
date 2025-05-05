@@ -201,5 +201,50 @@ namespace Compliance_Platform.Repositories
             await _context.SaveChangesAsync();
             return true;
         }
+
+        // Implementacja nowych metod dla historii weryfikacji
+        public async Task<int> AddVerificationHistoryAsync(
+            int instanceId,
+            string auditorId,
+            string newStatus,
+            string comment,
+            string oldStatus = null)
+        {
+            // Jeśli nie podano starego statusu, pobierz go z bazy
+            if (string.IsNullOrEmpty(oldStatus))
+            {
+                var instance = await _context.InstancesTool
+                    .FirstOrDefaultAsync(i => i.Id == instanceId);
+
+                if (instance != null)
+                {
+                    oldStatus = instance.Status;
+                }
+            }
+
+            var history = new CompPlatformVerificationHistory
+            {
+                InstanceId = instanceId,
+                AuditorId = auditorId,
+                OldStatus = oldStatus,
+                NewStatus = newStatus,
+                Comment = comment,
+                VerificationDate = DateTime.Now
+            };
+
+            _context.VerificationHistory.Add(history);
+            await _context.SaveChangesAsync();
+
+            return history.Id;
+        }
+
+        public async Task<List<CompPlatformVerificationHistory>> GetVerificationHistoryAsync(int instanceId)
+        {
+            return await _context.VerificationHistory
+                .Include(h => h.Auditor)
+                .Where(h => h.InstanceId == instanceId)
+                .OrderByDescending(h => h.VerificationDate)
+                .ToListAsync();
+        }
     }
 }

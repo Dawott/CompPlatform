@@ -23,5 +23,8 @@ namespace Compliance_Platform.Interfaces
         Task<int> SaveDraftAsync(CompPlatformInstance instance, List<CompPlatformInstanceAnswer> answers);
         Task<int> SubmitInstanceAsync(CompPlatformInstance instance, List<CompPlatformInstanceAnswer> answers);
         Task<bool> UpdateInstanceStatusAsync(int instanceId, string newStatus, string auditorId, string comment = null);
+
+        Task<int> AddVerificationHistoryAsync(int instanceId, string auditorId, string newStatus, string comment, string oldStatus);
+        Task<List<CompPlatformVerificationHistory>> GetVerificationHistoryAsync(int instanceId);
     }
 }

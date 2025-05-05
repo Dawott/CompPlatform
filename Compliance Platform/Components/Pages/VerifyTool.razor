@@ -6,6 +6,7 @@
 @inject IQuestionnaireRepository Repository
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager NavigationManager
+@inject IEmailService EmailService
 
 <PageTitle>Weryfikacja kwestionariusza</PageTitle>
 
@@ -38,6 +39,7 @@ else
             <span class="badge @GetStatusBadgeClass(instance.Status)">@instance.Status</span>
         </div>
         <div class="card-body">
+            <!-- Tool Information Section -->
             <div class="mb-4">
                 <h5>Informacje o narzędziu</h5>
                 <div class="row">
@@ -50,6 +52,9 @@ else
                         </div>
                         <div class="mb-2">
                             <strong>Właściciel:</strong> @(tool?.Wlasciciel?.Imie + " " + tool?.Wlasciciel?.Nazwisko)
+                        </div>
+                        <div class="mb-2">
+                            <strong>Opis:</strong> @tool?.Opis
                         </div>
                     </div>
                     <div class="col-md-6">
@@ -73,47 +78,113 @@ else
                 </div>
             </div>
 
+            <!-- Sekcja podsumowania ryzyka -->
             <div class="mb-4">
-                <h5>Odpowiedzi</h5>
-                @if (questionAnswers?.Count > 0)
-                {
-                    @foreach (var qa in questionAnswers)
-                    {
-                        <div class="card mb-3">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <div>
-                                    <strong>@qa.Question.Tresc</strong>
-                                    @if (qa.Question.Wymagane)
-                                    {
-                                        <span class="text-danger ms-1">*</span>
-                                    }
-                                </div>
-                                <div>
-                                    <span class="badge bg-info">
-                                        Kategoria: @GetCategoryDisplayName(qa.Question.Kategoria)
-                                    </span>
-                                </div>
-                            </div>
-                            <div class="card-body">
-                                @if (!string.IsNullOrEmpty(qa.Answer.OdpowiedzTekst))
-                                {
-                                    <div class="mb-2">@qa.Answer.OdpowiedzTekst</div>
-                                }
+                <h5>Podsumowanie oceny ryzyka</h5>
+                <div class="risk-level @GetRiskLevelClass(instance.PoziomRyzyka)">
+                    <h6>Poziom Ryzyka: @instance.PoziomRyzyka</h6>
+                    <p>Wartość kalkulacji ryzyka: @instance.KalkulacjaRyzyka.ToString("F2")</p>
 
-                                @if (qa.Answer.OpcjaOdpowiedziId.HasValue && qa.SelectedOption != null)
+                    @if (categoryScores != null && categoryScores.Any())
+                    {
+                        <div class="mt-3">
+                            <h6>Rozkład ryzyka według kategorii:</h6>
+                            <div class="row">
+                                @foreach (var category in categoryScores.OrderByDescending(c => c.Value))
                                 {
-                                    <div class="mb-2">
-                                        <strong>Wybrana opcja:</strong> @qa.SelectedOption.Treść
+                                    <div class="col-md-6 mb-2">
+                                        <div class="d-flex justify-content-between">
+                                            <span>@GetCategoryDisplayName(category.Key):</span>
+                                            <strong>@category.Value.ToString("F2")</strong>
+                                        </div>
+                                        <div class="progress">
+                                            <div class="progress-bar" role="progressbar"
+                                                 style="width: @GetCategoryPercentage(category.Value)%"
+                                                 aria-valuenow="@category.Value" aria-valuemin="0"
+                                                 aria-valuemax="@GetMaxCategoryScore()">
+                                            </div>
+                                        </div>
                                     </div>
                                 }
-
-                                <div class="small text-muted mt-2">
-                                    Waga ryzyka pytania: @qa.Question.WagaRyzyka.ToString("F2") |
-                                    Waga ryzyka odpowiedzi: @qa.Answer.WagaRyzykaPojedyncza.ToString("F2")
-                                </div>
                             </div>
                         </div>
                     }
+                </div>
+            </div>
+
+            <!-- Sekcja odpowiedzi -->
+            <div class="mb-4">
+                <h5>Odpowiedzi w kwestionariuszu</h5>
+                @if (questionAnswers?.Count > 0)
+                {
+                    <div class="accordion" id="questionnaire-answers">
+                        @for (int i = 0; i < questionAnswers.Count; i++)
+                        {
+                            var qa = questionAnswers[i];
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="heading-@i">
+                                    <button class="accordion-button @(i == 0 ? "" : "collapsed")" type="button"
+                                            data-bs-toggle="collapse" data-bs-target="#collapse-@i"
+                                            aria-expanded="@(i == 0 ? "true" : "false")" aria-controls="collapse-@i">
+                                        <div class="d-flex w-100 justify-content-between align-items-center">
+                                            <div>
+                                                <strong>@qa.Question.OrderIndex. @qa.Question.Tresc</strong>
+                                                @if (qa.Question.Wymagane)
+                                                {
+                                                    <span class="text-danger ms-1">*</span>
+                                                }
+                                            </div>
+                                            <span class="badge ms-2 @GetRiskWeightBadgeClass(qa.Answer.WagaRyzykaPojedyncza)">
+                                                @qa.Answer.WagaRyzykaPojedyncza.ToString("F1")
+                                            </span>
+                                        </div>
+                                    </button>
+                                </h2>
+                                <div id="collapse-@i" class="accordion-collapse collapse @(i == 0 ? "show" : "")"
+                                     aria-labelledby="heading-@i" data-bs-parent="#questionnaire-answers">
+                                    <div class="accordion-body">
+                                        <div class="row">
+                                            <div class="col-md-8">
+                                                @if (!string.IsNullOrEmpty(qa.Answer.OdpowiedzTekst))
+                                                {
+                                                    <div class="mb-2">
+                                                        <strong>Odpowiedź tekstowa:</strong>
+                                                        <p>@qa.Answer.OdpowiedzTekst</p>
+                                                    </div>
+                                                }
+
+                                                @if (qa.Answer.OpcjaOdpowiedziId.HasValue && qa.SelectedOption != null)
+                                                {
+                                                    <div class="mb-2">
+                                                        <strong>Wybrana opcja:</strong>
+                                                        <p>@qa.SelectedOption.Treść</p>
+                                                    </div>
+                                                }
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="card">
+                                                    <div class="card-header bg-light">
+                                                        Metadane pytania
+                                                    </div>
+                                                    <ul class="list-group list-group-flush">
+                                                        <li class="list-group-item">
+                                                            <small>Kategoria: @GetCategoryDisplayName(qa.Question.Kategoria)</small>
+                                                        </li>
+                                                        <li class="list-group-item">
+                                                            <small>Waga ryzyka pytania: @qa.Question.WagaRyzyka.ToString("F2")</small>
+                                                        </li>
+                                                        <li class="list-group-item">
+                                                            <small>Waga ryzyka odpowiedzi: @qa.Answer.WagaRyzykaPojedyncza.ToString("F2")</small>
+                                                        </li>
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
                 }
                 else
                 {
@@ -123,35 +194,63 @@ else
                 }
             </div>
 
+            <!-- SEkcja weryfikacji -->
             <EditForm Model="@verificationModel" OnValidSubmit="HandleVerificationSubmit">
                 <DataAnnotationsValidator />
 
-                <div class="mb-3">
+                <div class="mb-4">
                     <h5>Decyzja audytora</h5>
-                    <div class="form-group mb-3">
-                        <label for="status">Status:</label>
-                        <select class="form-select" id="status" @bind="verificationModel.NewStatus">
-                            <option value="Zatwierdzony">Zatwierdź</option>
-                            <option value="Do poprawy">Wymagana poprawa</option>
-                            <option value="Odrzucony">Odrzuć</option>
-                        </select>
-                    </div>
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="form-group mb-3">
+                                <label for="status">Status:</label>
+                                <select class="form-select" id="status" @bind="verificationModel.NewStatus">
+                                    <option value="Zatwierdzony">Zatwierdź</option>
+                                    <option value="Do poprawy">Wymagana poprawa</option>
+                                    <option value="Odrzucony">Odrzuć</option>
+                                </select>
+                            </div>
 
-                    <div class="form-group">
-                        <label for="comment">Komentarz:</label>
-                        <textarea class="form-control" id="comment" rows="4"
-                                  @bind="verificationModel.Comment"
-                                  placeholder="Dodaj komentarz dla wnioskującego..."></textarea>
+                            <div class="form-group mb-3">
+                                <label for="comment">Komentarz:</label>
+                                <textarea class="form-control" id="comment" rows="4"
+                                          @bind="verificationModel.Comment"
+                                          placeholder="Dodaj komentarz dla wnioskującego..."></textarea>
+                                <div class="form-text">
+                                    Komentarz jest wymagany dla statusu "Do poprawy" i "Odrzucony".
+                                </div>
+                            </div>
+
+                            <div class="form-group mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="sendNotification"
+                                           @bind="verificationModel.SendNotification" />
+                                    <label class="form-check-label" for="sendNotification">
+                                        Wyślij powiadomienie e-mail do wnioskującego
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="alert alert-info mt-3">
-                    <strong>Uwaga:</strong> Po zatwierdzeniu lub odrzuceniu, ten kwestionariusz nie będzie mógł być już zmieniony.
+                @if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    <div class="alert alert-danger">
+                        @errorMessage
+                    </div>
+                }
+
+                <div class="alert @GetAlertClassForStatus(verificationModel.NewStatus) mt-3">
+                    <strong>Uwaga:</strong> @GetStatusWarningMessage(verificationModel.NewStatus)
                 </div>
 
                 <div class="d-flex justify-content-between mt-4">
-                    <a href="/tool-details/@instance.ToolId" class="btn btn-secondary">Powrót do szczegółów narzędzia</a>
+                    <a href="/tool-details/@instance.ToolId" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Powrót do szczegółów narzędzia
+                    </a>
                     <button type="submit" class="btn @GetStatusButtonClass(verificationModel.NewStatus)">
+                        <i class="bi @GetStatusButtonIcon(verificationModel.NewStatus)"></i>
                         @GetStatusButtonText(verificationModel.NewStatus)
                     </button>
                 </div>
@@ -167,10 +266,12 @@ else
     private bool isLoading = true;
     private bool isAuditor = false;
     private string currentUserId;
+    private string errorMessage = "";
     private CompPlatformInstance instance;
     private CompPlatformTool tool;
     private CompPlatformQuestionnaires questionnaire;
     private List<QuestionAnswer> questionAnswers = new();
+    private Dictionary<string, decimal> categoryScores;
     private VerificationModel verificationModel = new();
 
     protected override async Task OnInitializedAsync()
@@ -235,13 +336,51 @@ else
                 }
             }
 
+            categoryScores = CalculateCategoryScores(answers, questions);
+
             // Ustaw domyślny status weryfikacji
             verificationModel.NewStatus = "Zatwierdzony";
+            verificationModel.SendNotification = true;
         }
+
+
+    }
+
+    private Dictionary<string, decimal> CalculateCategoryScores(List<CompPlatformInstanceAnswer> answers, List<CompPlatformQuestions> questions)
+    {
+        var scores = new Dictionary<string, decimal>();
+
+        foreach (var answer in answers)
+        {
+            var question = questions.FirstOrDefault(q => q.Id == answer.QuestionTemplateId);
+            if (question != null)
+            {
+                var category = question.Kategoria;
+
+                if (!scores.ContainsKey(category))
+                {
+                    scores[category] = 0;
+                }
+
+                scores[category] += answer.WagaRyzykaPojedyncza;
+            }
+        }
+
+        return scores;
     }
 
     private async Task HandleVerificationSubmit()
     {
+        errorMessage = "";
+
+        // Validacja
+        if ((verificationModel.NewStatus == "Do poprawy" || verificationModel.NewStatus == "Odrzucony")
+            && string.IsNullOrWhiteSpace(verificationModel.Comment))
+        {
+            errorMessage = "Komentarz jest wymagany dla statusów 'Do poprawy' i 'Odrzucony'.";
+            return;
+        }
+
         if (instance != null && isAuditor)
         {
             bool success = await Repository.UpdateInstanceStatusAsync(
@@ -252,8 +391,39 @@ else
 
             if (success)
             {
+                // Wyślij powiadomienie e-mail jeśli zaznaczono
+                if (verificationModel.SendNotification && tool?.Wlasciciel?.Email != null)
+                {
+                    try
+                    {
+                        await EmailService.SendStatusChangeNotificationAsync(
+                            tool.Wlasciciel.Email,
+                            instance.Id,
+                            tool.Nazwa,
+                            verificationModel.NewStatus,
+                            verificationModel.Comment);
+                    }
+                    catch (Exception)
+                    {
+                        // Log błędu - TBD
+                    }
+                }
+
+                // Zapisz historię weryfikacji
+
+                await Repository.AddVerificationHistoryAsync(
+                    instance.Id,
+                    currentUserId,
+                    verificationModel.NewStatus,
+                    verificationModel.Comment,
+                verificationModel.OldStatus = instance.Status);
+
                 // Przekieruj do szczegółów narzędzia
                 NavigationManager.NavigateTo($"/tool-details/{instance.ToolId}");
+            }
+            else
+            {
+                errorMessage = "Wystąpił błąd podczas zapisywania weryfikacji. Spróbuj ponownie.";
             }
         }
     }
@@ -310,6 +480,18 @@ else
         };
     }
 
+    private string GetRiskLevelClass(string riskLevel)
+    {
+        return riskLevel switch
+        {
+            "Ryzyko niskie" => "risk-low",
+            "Ryzyko ograniczone" => "risk-limited",
+            "Wysokie ryzyko" => "risk-high",
+            "System Zakazany" => "risk-prohibited",
+            _ => "risk-unknown"
+        };
+    }
+
     private string GetStatusButtonText(string status)
     {
         return status switch
@@ -318,6 +500,61 @@ else
             "Do poprawy" => "Wyślij do poprawy",
             "Odrzucony" => "Odrzuć kwestionariusz",
             _ => "Zatwierdź"
+        };
+    }
+
+    private string GetStatusButtonIcon(string status)
+    {
+        return status switch
+        {
+            "Zatwierdzony" => "bi-check-circle",
+            "Do poprawy" => "bi-arrow-clockwise",
+            "Odrzucony" => "bi-x-circle",
+            _ => "bi-check"
+        };
+    }
+
+    private decimal GetMaxCategoryScore()
+    {
+        return categoryScores?.Values.Max() ?? 0;
+    }
+
+    private int GetCategoryPercentage(decimal value)
+    {
+        decimal max = GetMaxCategoryScore();
+        return max > 0 ? (int)((value / max) * 100) : 0;
+    }
+
+    private string GetRiskWeightBadgeClass(decimal weight)
+    {
+        return weight switch
+        {
+            <= 10 => "bg-success",
+            <= 30 => "bg-warning text-dark",
+            <= 50 => "bg-danger",
+            _ => "bg-dark"
+        };
+    }
+
+    private string GetAlertClassForStatus(string status)
+    {
+        return status switch
+        {
+            "Zatwierdzony" => "alert-success",
+            "Do poprawy" => "alert-warning",
+            "Odrzucony" => "alert-danger",
+            _ => "alert-info"
+        };
+    }
+
+    private string GetStatusWarningMessage(string status)
+    {
+        return status switch
+        {
+            "Zatwierdzony" => "Zatwierdzenie kwestionariusza oznacza, że narzędzie spełnia wymagania zgodności z AI Act. Po zatwierdzeniu, wnioskujący otrzyma ocenę ryzyka i zalecenia.",
+            "Do poprawy" => "Odesłanie kwestionariusza do poprawy umożliwi wnioskującemu wprowadzenie zmian zgodnie z Twoimi uwagami i ponowne złożenie formularza.",
+            "Odrzucony" => "Odrzucenie kwestionariusza oznacza, że narzędzie nie spełnia wymagań zgodności z AI Act. Wnioskujący będzie musiał rozpocząć nowy proces rejestracji, jeśli zechce ponownie zarejestrować to narzędzie.",
+            _ => ""
         };
     }
 
@@ -332,5 +569,49 @@ else
     {
         public string NewStatus { get; set; } = "Zatwierdzony";
         public string Comment { get; set; } = "";
+        public bool SendNotification { get; set; } = true;
+        public string OldStatus { get; set; } = "";
     }
 }
+
+<style>
+    .risk-level {
+        padding: 15px;
+        border-radius: 4px;
+        margin-bottom: 15px;
+    }
+
+    .risk-low {
+        background-color: #d1e7dd;
+    }
+
+    .risk-limited {
+        background-color: #fff3cd;
+    }
+
+    .risk-high {
+        background-color: #f8d7da;
+    }
+
+    .risk-prohibited {
+        background-color: #842029;
+        color: white;
+    }
+
+    .risk-unknown {
+        background-color: #e9ecef;
+    }
+
+    .progress {
+        height: 10px;
+        margin-top: 2px;
+    }
+
+    .accordion-button::after {
+        margin-left: 10px;
+    }
+
+    .accordion-button {
+        padding: 0.75rem 1.25rem;
+    }
+</style>

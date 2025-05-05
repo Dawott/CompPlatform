@@ -2,9 +2,10 @@
 @using Compliance_Platform.Classes
 @using Compliance_Platform.Model
 @using Compliance_Platform.Interfaces
+@using Microsoft.AspNetCore.Components.Authorization
 @inject IQuestionnaireRepository Repository
 @inject RiskCalculationService RiskService
-
+@inject AuthenticationStateProvider AuthStateProvider
 
 <PageTitle>Podgląd Kwestionariusza</PageTitle>
 
@@ -44,6 +45,9 @@ else
                         <div class="mb-2">
                             <strong>Kategoria:</strong> @tool?.Kategoria
                         </div>
+                        <div class="mb-2">
+                            <strong>Właściciel:</strong> @(tool?.Wlasciciel?.Imie + " " + tool?.Wlasciciel?.Nazwisko)
+                        </div>
                     </div>
                     <div class="col-md-6">
                         <div class="mb-2">
@@ -55,97 +59,179 @@ else
                                 <strong>Data złożenia:</strong> @instance.DataZlozenia.Value.ToShortDateString()
                             </div>
                         }
-                        @if (instance.DataSprawdzenia.HasValue)
+                        @if (instance.DataSprawdzenia.HasValue && instance.Audytor != null)
                         {
                             <div class="mb-2">
                                 <strong>Data sprawdzenia:</strong> @instance.DataSprawdzenia.Value.ToShortDateString()
+                            </div>
+                            <div class="mb-2">
+                                <strong>Audytor:</strong> @(instance.Audytor?.Imie + " " + instance.Audytor?.Nazwisko)
                             </div>
                         }
                     </div>
                 </div>
             </div>
-
+            </div>
             <div class="mb-4">
-                <h5>Odpowiedzi</h5>
-                @if (questionAnswers?.Count > 0)
-                {
-                    @foreach (var qa in questionAnswers)
+                <ul class="nav nav-tabs" id="questionnaireTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="answers-tab" data-bs-toggle="tab" 
+                                data-bs-target="#answers-content" type="button" role="tab" 
+                                aria-controls="answers-content" aria-selected="true">
+                            Odpowiedzi
+                        </button>
+                    </li>
+                    @if (instance.Status != "Draft")
                     {
-                        <div class="card mb-3">
-                            <div class="card-header">
-                                <strong>@qa.Question.Tresc</strong>
-                                @if (qa.Question.Wymagane)
-                                {
-                                    <span class="text-danger ms-1">*</span>
-                                }
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="risk-tab" data-bs-toggle="tab" 
+                                    data-bs-target="#risk-content" type="button" role="tab" 
+                                    aria-controls="risk-content" aria-selected="false">
+                                Ocena ryzyka
+                            </button>
+                        </li>
+                    }
+                    @if (instance.Status != "Draft" && (isAuditor || showHistory))
+                    {
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="history-tab" data-bs-toggle="tab" 
+                                    data-bs-target="#history-content" type="button" role="tab" 
+                                    aria-controls="history-content" aria-selected="false">
+                                Historia weryfikacji
+                            </button>
+                        </li>
+                    }
+                </ul>
+
+                <div class="tab-content mt-3" id="questionnaireTabsContent">
+                    <div class="tab-pane fade show active" id="answers-content" role="tabpanel" aria-labelledby="answers-tab">
+                        @if (questionAnswers?.Count > 0)
+                        {
+                            @foreach (var qa in questionAnswers)
+                            {
+                                <div class="card mb-3">
+                                    <div class="card-header">
+                                        <strong>@qa.Question.Tresc</strong>
+                                        @if (qa.Question.Wymagane)
+                                        {
+                                            <span class="text-danger ms-1">*</span>
+                                        }
+                                    </div>
+                                    <div class="card-body">
+                                        @if (!string.IsNullOrEmpty(qa.Answer.OdpowiedzTekst))
+                                        {
+                                            <div class="mb-2">@qa.Answer.OdpowiedzTekst</div>
+                                        }
+                                        
+                                        @if (qa.Answer.OpcjaOdpowiedziId.HasValue && qa.SelectedOption != null)
+                                        {
+                                            <div class="mb-2">
+                                                <strong>Wybrana opcja:</strong> @qa.SelectedOption.Treść
+                                            </div>
+                                        }
+                                        
+                                        @if (showRiskValues)
+                                        {
+                                            <div class="small text-muted mt-2">
+                                                Waga ryzyka odpowiedzi: @qa.Answer.WagaRyzykaPojedyncza.ToString("F2")
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="alert alert-info">
+                                Brak odpowiedzi w tym kwestionariuszu.
                             </div>
-                            <div class="card-body">
-                                @if (!string.IsNullOrEmpty(qa.Answer.OdpowiedzTekst))
-                                {
-                                    <div class="mb-2">@qa.Answer.OdpowiedzTekst</div>
-                                }
+                        }
+                    </div>
+
+                    @if (instance.Status != "Draft")
+                    {
+                        <div class="tab-pane fade" id="risk-content" role="tabpanel" aria-labelledby="risk-tab">
+                            <div class="risk-level @GetRiskLevelClass(instance.PoziomRyzyka)">
+                                <h5>Poziom Ryzyka: @instance.PoziomRyzyka</h5>
+                                <p>Całkowita kalkulacja ryzyka: @instance.KalkulacjaRyzyka.ToString("F2")</p>
                                 
-                                @if (qa.Answer.OpcjaOdpowiedziId.HasValue && qa.SelectedOption != null)
+                                @if (categoryScores != null && categoryScores.Any())
                                 {
-                                    <div class="mb-2">
-                                        <strong>Wybrana opcja:</strong> @qa.SelectedOption.Treść
+                                    <div class="mt-3">
+                                        <h6>Rozkład ryzyka według kategorii:</h6>
+                                        <div class="row">
+                                            @foreach (var category in categoryScores.OrderByDescending(c => c.Value))
+                                            {
+                                                <div class="col-md-6 mb-2">
+                                                    <div class="d-flex justify-content-between">
+                                                        <span>@GetCategoryDisplayName(category.Key):</span>
+                                                        <strong>@category.Value.ToString("F2")</strong>
+                                                    </div>
+                                                    <div class="progress">
+                                                        <div class="progress-bar" role="progressbar" 
+                                                            style="width: @GetCategoryPercentage(category.Value)%"
+                                                            aria-valuenow="@category.Value" aria-valuemin="0" 
+                                                            aria-valuemax="@GetMaxCategoryScore()">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
                                     </div>
                                 }
                                 
-                                @if (showRiskValues)
+                                @if (instance.Status == "Zatwierdzony")
                                 {
-                                    <div class="small text-muted mt-2">
-                                        Waga ryzyka odpowiedzi: @qa.Answer.WagaRyzykaPojedyncza.ToString("F2")
+                                    <div class="mt-4">
+                                        <a href="/risk-assessment/@instance.Id" class="btn btn-outline-primary">
+                                            <i class="bi bi-graph-up"></i> Zobacz pełną ocenę ryzyka
+                                        </a>
                                     </div>
                                 }
                             </div>
                         </div>
                     }
-                }
-                else
-                {
-                    <div class="alert alert-info">
-                        Brak odpowiedzi w tym kwestionariuszu.
-                    </div>
-                }
-            </div>
-
-            @if (instance.Status != "Draft")
-            {
-                <div class="mb-4">
-                    <h5>Ocena ryzyka</h5>
-                    <div class="risk-level @GetRiskLevelClass(instance.PoziomRyzyka)">
-                        <h6>Poziom Ryzyka: @instance.PoziomRyzyka</h6>
-                        <p>Całkowita kalkulacja ryzyka: @instance.KalkulacjaRyzyka.ToString("F2")</p>
-                    </div>
+                    
+                    @if (instance.Status != "Draft" && (isAuditor || showHistory))
+                    {
+                        <div class="tab-pane fade" id="history-content" role="tabpanel" aria-labelledby="history-tab">
+                            <VerificationHistoryComponent InstanceId="@instance.Id" />
+                        </div>
+                    }
                 </div>
+            </div></div>
             }
-        </div>
-        <div class="card-footer">
-            <div class="d-flex justify-content-between">
-                <a href="/tool-details/@instance.ToolId" class="btn btn-secondary">Powrót do szczegółów narzędzia</a>
-                
-                @if (instance.Status == "Zatwierdzony")
-                {
-                    <a href="/risk-assessment/@instance.Id" class="btn btn-success">Pełna ocena ryzyka</a>
-                }
-            </div>
-        </div>
-    </div>
-}
-
-
-
 
 @code {
     [Parameter] public int InstanceId { get; set; }
 
     private bool isLoading = true;
     private bool showRiskValues = false;
+    private bool isAuditor = false;
+    private bool isToolOwner = false;
+    private bool showHistory = false;
+    private string currentUserId;
     private CompPlatformInstance instance;
     private CompPlatformTool tool;
     private CompPlatformQuestionnaires questionnaire;
     private List<QuestionAnswer> questionAnswers = new();
+    private Dictionary<string, decimal> categoryScores;
+    
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+
+        // Sprawdź uprawnienia
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        isAuditor = user.IsInRole("Audytor");
+        currentUserId = user.FindFirst(c => c.Type == "sub")?.Value;
+
+        await LoadQuestionnaireDataAsync();
+
+        isLoading = false;
+    }
 
     private async Task LoadQuestionnaireDataAsync()
     {
@@ -156,6 +242,12 @@ else
         {
             // Pobierz narzędzie
             tool = await Repository.GetToolAsync(instance.ToolId);
+
+            // Sprawdź czy użytkownik jest właścicielem
+            isToolOwner = tool?.OwnerId == currentUserId;
+
+            // Sprawdź, czy pokazać historię dla właściciela
+            showHistory = isToolOwner && (instance.Status == "Do poprawy" || instance.Status == "Odrzucony" || instance.Status == "Zatwierdzony");
 
             // Pobierz szablon kwestionariusza
             questionnaire = await Repository.GetQuestionnaireAsync(instance.QuestionnaireId);
@@ -190,10 +282,47 @@ else
                 }
             }
 
+            categoryScores = CalculateCategoryScores(answers, questions);
+
             // Pokaż wartości ryzyka dla audytorów (można rozszerzyć o sprawdzanie roli)
             showRiskValues = instance.Status != "Draft";
         }
     }
+
+    private Dictionary<string, decimal> CalculateCategoryScores(List<CompPlatformInstanceAnswer> answers, List<CompPlatformQuestions> questions)
+    {
+        var scores = new Dictionary<string, decimal>();
+
+        foreach (var answer in answers)
+        {
+            var question = questions.FirstOrDefault(q => q.Id == answer.QuestionTemplateId);
+            if (question != null)
+            {
+                var category = question.Kategoria;
+
+                if (!scores.ContainsKey(category))
+                {
+                    scores[category] = 0;
+                }
+
+                scores[category] += answer.WagaRyzykaPojedyncza;
+            }
+        }
+
+        return scores;
+    }
+
+    private decimal GetMaxCategoryScore()
+    {
+        return categoryScores?.Values.Any() == true ? categoryScores.Values.Max() : 0;
+    }
+
+    private int GetCategoryPercentage(decimal value)
+    {
+        decimal max = GetMaxCategoryScore();
+        return max > 0 ? (int)((value / max) * 100) : 0;
+    }
+
 
     private string GetStatusBadgeClass(string status)
     {
@@ -232,6 +361,22 @@ else
         };
     }
 
+    private string GetCategoryDisplayName(string categoryKey)
+    {
+        // Mapowanie kategorii do UI
+        return categoryKey switch
+        {
+            "PrawaPodstawowe" => "Prawa Podstawowe",
+            "Bezpieczenstwo" => "Bezpieczeństwo",
+            "Przejrzystosc" => "Przejrzystość",
+            "NadzorLudzki" => "Nadzór Ludzki",
+            "DataGovernance" => "Zarządzanie Danymi",
+            "OdpornoscTechniczna" => "Odporność Techniczna",
+            "Inne" => "Inne",
+            _ => categoryKey
+        };
+    }
+
     private class QuestionAnswer
     {
         public CompPlatformQuestions Question { get; set; }
@@ -263,4 +408,21 @@ else
         background-color: #842029;
         color: white;
     }
+
+    .risk-unknown {
+        background-color: #e9ecef;
+    }
+
+    .progress {
+        height: 10px;
+        margin-top: 2px;
+    }
+
+    .nav-tabs .nav-link {
+        color: #495057;
+    }
+
+        .nav-tabs .nav-link.active {
+            font-weight: 500;
+        }
 </style>

@@ -15,6 +15,7 @@ namespace Compliance_Platform.Model
         public DbSet<CompPlatformInstanceAnswer> InstanceAnswers { get; set; }
         public DbSet<CompPlatformInstance> InstancesTool { get; set; }
         public DbSet<CompPlatformAnswers> Answers { get; set; }
+        public DbSet<CompPlatformVerificationHistory> VerificationHistory { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -43,6 +44,18 @@ namespace Compliance_Platform.Model
         .WithMany()
         .HasForeignKey(a => a.QuestionTemplateId)
         .OnDelete(DeleteBehavior.NoAction);
+
+            modelBuilder.Entity<CompPlatformVerificationHistory>()
+               .HasOne(h => h.Instance)
+               .WithMany()
+               .HasForeignKey(h => h.InstanceId)
+               .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<CompPlatformVerificationHistory>()
+                .HasOne(h => h.Auditor)
+                .WithMany()
+                .HasForeignKey(h => h.AuditorId)
+                .OnDelete(DeleteBehavior.NoAction);
         }
     }
 }

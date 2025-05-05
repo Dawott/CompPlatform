@@ -1,0 +1,201 @@
+﻿@using Compliance_Platform.Model
+@using Compliance_Platform.Interfaces
+@inject IQuestionnaireRepository Repository
+
+<div class="verification-history">
+    @if (isLoading)
+    {
+        <div class="spinner-border spinner-border-sm text-primary" role="status">
+            <span class="visually-hidden">Ładowanie...</span>
+        </div>
+        <span class="ms-2">Ładowanie historii...</span>
+    }
+    else if (history.Count == 0)
+    {
+        <div class="alert alert-info">
+            Brak historii weryfikacji dla tego kwestionariusza.
+        </div>
+    }
+    else
+    {
+        <div class="history-timeline">
+            @foreach (var item in history)
+            {
+                <div class="history-item">
+                    <div class="history-item-icon @GetStatusIconClass(item.NewStatus)">
+                        <i class="bi @GetStatusIcon(item.NewStatus)"></i>
+                    </div>
+                    <div class="history-item-content">
+                        <div class="history-item-header">
+                            <h6 class="mb-0">
+                                Status zmieniony na
+                                <span class="badge @GetStatusBadgeClass(item.NewStatus)">@item.NewStatus</span>
+                            </h6>
+                            <small class="text-muted">
+                                @item.VerificationDate.ToString("dd.MM.yyyy HH:mm") przez @(item.Auditor?.Imie + " " + item.Auditor?.Nazwisko)
+                            </small>
+                        </div>
+                        @if (!string.IsNullOrEmpty(item.Comment))
+                        {
+                            <div class="history-item-body mt-2">
+                                <p class="comment-text">@item.Comment</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+
+@code {
+    [Parameter]
+    public int InstanceId { get; set; }
+
+    private bool isLoading = true;
+    private List<CompPlatformVerificationHistory> history = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadVerificationHistoryAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (InstanceId > 0)
+        {
+            await LoadVerificationHistoryAsync();
+        }
+    }
+
+    private async Task LoadVerificationHistoryAsync()
+    {
+        isLoading = true;
+        history = await Repository.GetVerificationHistoryAsync(InstanceId);
+        isLoading = false;
+    }
+
+    private string GetStatusBadgeClass(string status)
+    {
+        return status switch
+        {
+            "Draft" => "bg-secondary",
+            "Do weryfikacji" => "bg-primary",
+            "Do poprawy" => "bg-warning text-dark",
+            "Zatwierdzony" => "bg-success",
+            "Odrzucony" => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetStatusIconClass(string status)
+    {
+        return status switch
+        {
+            "Draft" => "status-draft",
+            "Do weryfikacji" => "status-pending",
+            "Do poprawy" => "status-revision",
+            "Zatwierdzony" => "status-approved",
+            "Odrzucony" => "status-rejected",
+            _ => "status-default"
+        };
+    }
+
+    private string GetStatusIcon(string status)
+    {
+        return status switch
+        {
+            "Draft" => "bi-file-earmark",
+            "Do weryfikacji" => "bi-clock",
+            "Do poprawy" => "bi-arrow-clockwise",
+            "Zatwierdzony" => "bi-check-circle",
+            "Odrzucony" => "bi-x-circle",
+            _ => "bi-circle"
+        };
+    }
+}
+
+<style>
+    .verification-history {
+        margin-top: 20px;
+    }
+
+    .history-timeline {
+        position: relative;
+        margin-left: 20px;
+        padding-left: 20px;
+    }
+
+        .history-timeline::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background-color: #e9ecef;
+        }
+
+    .history-item {
+        position: relative;
+        margin-bottom: 25px;
+        display: flex;
+    }
+
+        .history-item:last-child {
+            margin-bottom: 0;
+        }
+
+    .history-item-icon {
+        position: absolute;
+        left: -29px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background-color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 12px;
+    }
+
+    .history-item-content {
+        background-color: #f8f9fa;
+        border-radius: 4px;
+        padding: 12px 15px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        flex: 1;
+    }
+
+    .comment-text {
+        margin: 0;
+        white-space: pre-line;
+    }
+
+    /* Ikonki statusów */
+    .status-draft {
+        background-color: #6c757d;
+    }
+
+    .status-pending {
+        background-color: #0d6efd;
+    }
+
+    .status-revision {
+        background-color: #ffc107;
+    }
+
+    .status-approved {
+        background-color: #198754;
+    }
+
+    .status-rejected {
+        background-color: #dc3545;
+    }
+
+    .status-default {
+        background-color: #6c757d;
+    }
+</style>
