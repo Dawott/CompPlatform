@@ -1,0 +1,13 @@
+﻿@page "/logout"
+@using Microsoft.AspNetCore.Identity
+@using Compliance_Platform.Model
+@inject SignInManager<CompPlatformUser> SignInManager
+@inject NavigationManager NavigationManager
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await SignInManager.SignOutAsync();
+        NavigationManager.NavigateTo("/");
+    }
+}

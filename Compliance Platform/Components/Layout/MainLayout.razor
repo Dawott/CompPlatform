@@ -7,7 +7,18 @@
     </div>
 
     <main>
-       
+       <div class="top-row px-4">
+            <AuthorizeView>
+                <Authorized>
+                    <span class="me-3">Witaj, @context.User.Identity?.Name!</span>
+                    <a href="/logout" class="btn btn-outline-secondary btn-sm">Wyloguj</a>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="/login" class="btn btn-outline-primary btn-sm me-2">Zaloguj</a>
+                    <a href="/register" class="btn btn-primary btn-sm">Zarejestruj</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
         <article class="content px-4">
             @Body
         </article>

@@ -20,7 +20,7 @@ builder.Services.AddDbContext<CompPlatformDbContext>((options) =>
 });
 
 //Fragment do obs³ugi kont
-builder.Services.AddDefaultIdentity<IdentityUser>(options => {
+builder.Services.AddIdentity<CompPlatformUser, IdentityRole>(options => {
     options.SignIn.RequireConfirmedAccount = false; // TBD
     options.Password.RequireDigit = true;
     options.Password.RequireLowercase = true;
@@ -28,8 +28,25 @@ builder.Services.AddDefaultIdentity<IdentityUser>(options => {
     options.Password.RequireNonAlphanumeric = true;
     options.Password.RequiredLength = 8;
 })
-.AddRoles<IdentityRole>() // Wsparcie ról
+.AddDefaultTokenProviders()
 .AddEntityFrameworkStores<CompPlatformDbContext>();
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("RequireAdministratorRole",
+        policy => policy.RequireRole("Administrator"));
+    options.AddPolicy("RequireAuditorRole",
+        policy => policy.RequireRole("Audytor"));
+    options.AddPolicy("RequireRejestratorRole",
+        policy => policy.RequireRole("Rejestrator"));
+});
+
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.LoginPath = "/login";
+    options.LogoutPath = "/logout";
+    options.AccessDeniedPath = "/access-denied";
+});
 
 builder.Services.AddScoped<IQuestionnaireRepository, QuestionnaireRepository>();
 builder.Services.AddScoped<IQuestionRepository, QuestionRepository>();
@@ -37,10 +54,6 @@ builder.Services.AddScoped<QuestionnaireService>();
 builder.Services.AddScoped<QuestionnaireState>();
 builder.Services.AddScoped<RiskCalculationService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
-
-builder.Services.AddIdentity<CompPlatformUser, IdentityRole>()
-    .AddEntityFrameworkStores<CompPlatformDbContext>()
-    .AddDefaultTokenProviders();
 
 var app = builder.Build();
 // Configure the HTTP request pipeline.
@@ -62,3 +75,5 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
+
+await SeedData.Initialize(app.Services);

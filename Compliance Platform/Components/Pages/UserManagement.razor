@@ -1,0 +1,373 @@
+﻿@page "/user-management"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Compliance_Platform.Model
+@using System.ComponentModel.DataAnnotations
+@inject UserManager<CompPlatformUser> UserManager
+@inject RoleManager<IdentityRole> RoleManager
+@attribute [Authorize(Roles = "Administrator")]
+
+<PageTitle>Zarządzanie kontami</PageTitle>
+
+<h3>Zarządzanie kontami</h3>
+
+@if (isLoading)
+{
+    <div class="loading-container">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Ładowanie...</span>
+        </div>
+        <p>Wczytywanie użytkowników...</p>
+    </div>
+}
+else
+{
+    <div class="mb-3 text-end">
+        <button class="btn btn-primary" @onclick="() => ShowUserModal(null)">
+            <i class="bi bi-person-plus"></i> Dodaj nowego użytkownika
+        </button>
+    </div>
+
+    @if (!users.Any())
+    {
+        <div class="alert alert-info">Nie odnaleziono użytkowników.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table-striped table-hover table">
+                <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Imię i nazwisko</th>
+                        <th>Departament</th>
+                        <th>Rola</th>
+                        <th>Akcje</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in users)
+                    {
+                        <tr>
+                            <td>@user.Email</td>
+                            <td>@(user.Imie + " " + user.Nazwisko)</td>
+                            <td>@user.Departament</td>
+                            <td>@user.Rola</td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <button class="btn btn-sm btn-info" @onclick="() => ShowUserModal(user)">
+                                        <i class="bi bi-pencil"></i> Edytuj
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" @onclick="() => ShowDeleteConfirmation(user)">
+                                        <i class="bi bi-trash"></i> Skasuj
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    @if (showUserModal)
+    {
+        <div class="modal fade show" style="display:block;" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">@(editingUser.Id != null ? "Edit User" : "Add User")</h5>
+                        <button type="button" class="btn-close" @onclick="CloseUserModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <EditForm Model="@editingUser" OnValidSubmit="SaveUser">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary />
+
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email</label>
+                                <InputText id="email" @bind-Value="editingUser.Email" class="form-control" />
+                                <ValidationMessage For="@(() => editingUser.Email)" />
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="imie" class="form-label">Imię</label>
+                                    <InputText id="imie" @bind-Value="editingUser.Imie" class="form-control" />
+                                    <ValidationMessage For="@(() => editingUser.Imie)" />
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="nazwisko" class="form-label">Nazwisko</label>
+                                    <InputText id="nazwisko" @bind-Value="editingUser.Nazwisko" class="form-control" />
+                                    <ValidationMessage For="@(() => editingUser.Nazwisko)" />
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="departament" class="form-label">Departament</label>
+                                <InputText id="departament" @bind-Value="editingUser.Departament" class="form-control" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="rola" class="form-label">Rola</label>
+                                <InputSelect id="rola" @bind-Value="editingUser.Rola" class="form-select">
+                                    <option value="">-- Wybierz rolę --</option>
+                                    <option value="Administrator">Administrator</option>
+                                    <option value="Rejestrator">Rejestrator</option>
+                                    <option value="Audytor">Audytor</option>
+                                </InputSelect>
+                                <ValidationMessage For="@(() => editingUser.Rola)" />
+                            </div>
+
+                            @if (editingUser.Id == null)
+                            {
+                                <div class="mb-3">
+                                    <label for="password" class="form-label">Hasło</label>
+                                    <InputText id="password" type="password" @bind-Value="editingUser.Password" class="form-control" />
+                                    <ValidationMessage For="@(() => editingUser.Password)" />
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="confirmPassword" class="form-label">Potwierdź hasło</label>
+                                    <InputText id="confirmPassword" type="password" @bind-Value="editingUser.ConfirmPassword" class="form-control" />
+                                    <ValidationMessage For="@(() => editingUser.ConfirmPassword)" />
+                                </div>
+                            }
+                            else if (showChangePassword)
+                            {
+                                <div class="mb-3">
+                                    <label for="newPassword" class="form-label">Nowe hasło</label>
+                                    <InputText id="newPassword" type="password" @bind-Value="editingUser.Password" class="form-control" />
+                                    <ValidationMessage For="@(() => editingUser.Password)" />
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="confirmNewPassword" class="form-label">Potwierdź hasło</label>
+                                    <InputText id="confirmNewPassword" type="password" @bind-Value="editingUser.ConfirmPassword" class="form-control" />
+                                    <ValidationMessage For="@(() => editingUser.ConfirmPassword)" />
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="mb-3">
+                                    <button type="button" class="btn btn-outline-secondary" @onclick="ToggleChangePassword">
+                                        Zmień hasło
+                                    </button>
+                                </div>
+                            }
+
+                            <div class="text-end">
+                                <button type="button" class="btn btn-secondary me-2" @onclick="CloseUserModal">Anuluj</button>
+                                <button type="submit" class="btn btn-primary">Zapisz</button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop fade show"></div>
+    }
+
+    @if (showDeleteConfirmation)
+    {
+        <div class="modal fade show" style="display:block;" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Potwierdź</h5>
+                        <button type="button" class="btn-close" @onclick="CloseDeleteConfirmation"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Czy na pewno chcesz usunąć użytkownika: <strong>@(currentUser?.Email)</strong>?</p>
+                        <p class="text-danger">Tej akcji nie można cofnąć!</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" @onclick="CloseDeleteConfirmation">Anuluj</button>
+                        <button type="button" class="btn btn-danger" @onclick="ConfirmDeleteUser">Skasuj</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop fade show"></div>
+    }
+}
+
+
+@code {
+    private bool isLoading = true;
+    private List<CompPlatformUser> users = new();
+    private bool showUserModal = false;
+    private bool showDeleteConfirmation = false;
+    private bool showChangePassword = false;
+    private CompPlatformUser currentUser;
+    private UserEditModel editingUser = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsersAsync();
+        isLoading = false;
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        users = await UserManager.Users.ToListAsync();
+    }
+
+    private void ShowUserModal(CompPlatformUser user)
+    {
+        showChangePassword = false;
+
+        if (user == null)
+        {
+            editingUser = new UserEditModel();
+        }
+        else
+        {
+            editingUser = new UserEditModel
+                {
+                    Id = user.Id,
+                    Email = user.Email,
+                    Imie = user.Imie,
+                    Nazwisko = user.Nazwisko,
+                    Departament = user.Departament,
+                    Rola = user.Rola
+                };
+        }
+
+        showUserModal = true;
+    }
+
+    private void CloseUserModal()
+    {
+        showUserModal = false;
+    }
+
+    private void ToggleChangePassword()
+    {
+        showChangePassword = !showChangePassword;
+        if (!showChangePassword)
+        {
+            editingUser.Password = string.Empty;
+            editingUser.ConfirmPassword = string.Empty;
+        }
+    }
+
+    private async Task SaveUser()
+    {
+        if (editingUser.Id == null)
+        {
+            // Utwórz użytkownika
+            if (editingUser.Password != editingUser.ConfirmPassword)
+            {
+                // Mismatch hasła
+                return;
+            }
+
+            var user = new CompPlatformUser
+                {
+                    UserName = editingUser.Email,
+                    Email = editingUser.Email,
+                    Imie = editingUser.Imie,
+                    Nazwisko = editingUser.Nazwisko,
+                    Departament = editingUser.Departament,
+                    Rola = editingUser.Rola
+                };
+
+            var result = await UserManager.CreateAsync(user, editingUser.Password);
+
+            if (result.Succeeded)
+            {
+                // Dodaj użytkownika do roli
+                await UserManager.AddToRoleAsync(user, editingUser.Rola);
+            }
+        }
+        else
+        {
+            // Update użytkownika (istniejącego)
+            var user = await UserManager.FindByIdAsync(editingUser.Id);
+
+            if (user != null)
+            {
+                user.Email = editingUser.Email;
+                user.UserName = editingUser.Email;
+                user.Imie = editingUser.Imie;
+                user.Nazwisko = editingUser.Nazwisko;
+                user.Departament = editingUser.Departament;
+
+                // Sprawdź rolę
+                if (user.Rola != editingUser.Rola)
+                {
+                    // Usuń poprzednią rolę
+                    var roles = await UserManager.GetRolesAsync(user);
+                    await UserManager.RemoveFromRolesAsync(user, roles);
+
+                    // Dodaj nową rolę
+                    await UserManager.AddToRoleAsync(user, editingUser.Rola);
+
+                    user.Rola = editingUser.Rola;
+                }
+
+                await UserManager.UpdateAsync(user);
+
+                // Zmień hasło na prośbę
+                if (showChangePassword && !string.IsNullOrEmpty(editingUser.Password))
+                {
+                    if (editingUser.Password == editingUser.ConfirmPassword)
+                    {
+                        var token = await UserManager.GeneratePasswordResetTokenAsync(user);
+                        await UserManager.ResetPasswordAsync(user, token, editingUser.Password);
+                    }
+                }
+            }
+        }
+
+        await LoadUsersAsync();
+        showUserModal = false;
+    }
+
+    private void ShowDeleteConfirmation(CompPlatformUser user)
+    {
+        currentUser = user;
+        showDeleteConfirmation = true;
+    }
+
+    private void CloseDeleteConfirmation()
+    {
+        showDeleteConfirmation = false;
+    }
+
+    private async Task ConfirmDeleteUser()
+    {
+        if (currentUser != null)
+        {
+            await UserManager.DeleteAsync(currentUser);
+            await LoadUsersAsync();
+        }
+
+        showDeleteConfirmation = false;
+    }
+
+    private class UserEditModel
+    {
+        public string Id { get; set; }
+
+        [Required(ErrorMessage = "Email wymagany")]
+        [EmailAddress(ErrorMessage = "Błędny format")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Imię jest wymagane")]
+        public string Imie { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Nazwisko wymagane")]
+        public string Nazwisko { get; set; } = string.Empty;
+
+        public string Departament { get; set; }
+
+        [Required(ErrorMessage = "Rola wymagana")]
+        public string Rola { get; set; } = string.Empty;
+
+        public string Password { get; set; } = string.Empty;
+
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+}
