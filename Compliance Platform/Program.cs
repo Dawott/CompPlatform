@@ -12,16 +12,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-
-
 // SQL konektor
 var dbConnectionsString = builder.Configuration.GetConnectionString("CompPlatform");
 builder.Services.AddDbContext<CompPlatformDbContext>((options) =>
 {
     options.UseSqlServer(dbConnectionsString);
 });
-
-builder.Services.AddTransient<IEmailService, EmailService>();
 
 //Fragment do obs³ugi kont
 builder.Services.AddDefaultIdentity<IdentityUser>(options => {
@@ -40,6 +36,11 @@ builder.Services.AddScoped<IQuestionRepository, QuestionRepository>();
 builder.Services.AddScoped<QuestionnaireService>();
 builder.Services.AddScoped<QuestionnaireState>();
 builder.Services.AddScoped<RiskCalculationService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+
+builder.Services.AddIdentity<CompPlatformUser, IdentityRole>()
+    .AddEntityFrameworkStores<CompPlatformDbContext>()
+    .AddDefaultTokenProviders();
 
 var app = builder.Build();
 // Configure the HTTP request pipeline.
@@ -51,9 +52,11 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseStaticFiles();
 app.UseAntiforgery();
+app.UseRouting();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

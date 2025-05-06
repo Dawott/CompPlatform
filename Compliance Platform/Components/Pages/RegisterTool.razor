@@ -1,0 +1,133 @@
+﻿@page "/register-tool"
+@using Compliance_Platform.Model
+@using Compliance_Platform.Interfaces
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IQuestionnaireRepository Repository
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+
+<PageTitle>Rejestracja nowego narzędzia AI</PageTitle>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Rejestracja nowego narzędzia AI</h3>
+    </div>
+    <div class="card-body">
+        <EditForm Model="@newTool" OnValidSubmit="HandleValidSubmit">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <div class="mb-3">
+                <label for="toolName" class="form-label">Nazwa narzędzia</label>
+                <InputText id="toolName" @bind-Value="newTool.Nazwa" class="form-control" />
+                <ValidationMessage For="@(() => newTool.Nazwa)" />
+            </div>
+
+            <div class="mb-3">
+                <label for="toolCategory" class="form-label">Kategoria</label>
+                <InputSelect id="toolCategory" @bind-Value="newTool.Kategoria" class="form-select">
+                    <option value="">-- Wybierz kategorię --</option>
+                    <option value="PrzeznaczenieOgolne">Zastosowanie ogólne</option>
+                    <option value="DiagnostykaMedyczna">Diagnostyka medyczna</option>
+                    <option value="Biometria">Biometria</option>
+                    <option value="Profilowanie">Profilowanie</option>
+                    <option value="KrytycznaInfrastruktura">Infrastruktura krytyczna</option>
+                    <option value="EgzekwowaniePrawa">Egzekwowanie prawa</option>
+                    <option value="OcenaEdukacji">Ocena edukacyjna</option>
+                    <option value="OcenaZatrudnienia">Ocena zatrudnienia</option>
+                    <option value="Inne">Inne</option>
+                </InputSelect>
+                <ValidationMessage For="@(() => newTool.Kategoria)" />
+            </div>
+
+            <div class="mb-3">
+                <label for="toolDescription" class="form-label">Opis narzędzia</label>
+                <InputTextArea id="toolDescription" @bind-Value="newTool.Opis" class="form-control" rows="4" />
+                <ValidationMessage For="@(() => newTool.Opis)" />
+                <div class="form-text">Opisz przeznaczenie narzędzia, technologię oraz sposób jego wykorzystania w organizacji.</div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Data powstania</label>
+                <InputDate @bind-Value="newTool.DataPowstania" class="form-control" />
+                <ValidationMessage For="@(() => newTool.DataPowstania)" />
+            </div>
+
+            <div class="mt-4 d-flex justify-content-between">
+                <a href="/tools" class="btn btn-secondary">Anuluj</a>
+                <button type="submit" class="btn btn-primary">Zarejestruj narzędzie</button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private ToolRegistrationModel newTool = new()
+        {
+            DataPowstania = DateTime.Now,
+            Status = "Draft"
+        };
+
+    private string currentUserId;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Pobierz zalogowanego użytkownika
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        currentUserId = user.FindFirst(c => c.Type == "sub")?.Value;
+
+        isLoading = false;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            // Utwórz nową encję
+            var tool = new CompPlatformTool
+                {
+                    Nazwa = newTool.Nazwa,
+                    Opis = newTool.Opis,
+                    Kategoria = newTool.Kategoria,
+                    DataPowstania = newTool.DataPowstania,
+                    Status = "Draft",
+                    OwnerId = currentUserId
+                };
+
+            // Zapisz narzędzie w bazie
+            int toolId = await Repository.AddToolAsync(tool);
+
+            // Po zapisie nawiguj do
+            if (toolId > 0)
+            {
+                NavigationManager.NavigateTo($"/questionnaire-select/{toolId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            // TBD - loger
+            Console.WriteLine($"Error creating tool: {ex.Message}");
+        }
+    }
+
+    private class ToolRegistrationModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Nazwa jest wymagana")]
+        [System.ComponentModel.DataAnnotations.StringLength(100, ErrorMessage = "Nazwa nie może być dłuższa niż 100 znaków")]
+        public string Nazwa { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Kategoria jest wymagana")]
+        public string Kategoria { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Opis jest wymagany")]
+        [System.ComponentModel.DataAnnotations.StringLength(1000, ErrorMessage = "Opis nie może być dłuższy niż 1000 znaków")]
+        public string Opis { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Data powstania jest wymagana")]
+        public DateTime DataPowstania { get; set; }
+
+        public string Status { get; set; } = string.Empty;
+    }
+}

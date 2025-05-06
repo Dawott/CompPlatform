@@ -10,6 +10,7 @@ namespace Compliance_Platform.Interfaces
         Task<CompPlatformTool> GetToolAsync(int toolId);
         Task<List<CompPlatformTool>> GetToolsByOwnerAsync(string ownerId);
         Task<List<CompPlatformTool>> GetAllToolsAsync();
+        Task<int> AddToolAsync(CompPlatformTool tool);
 
         Task<CompPlatformInstance> GetInstanceAsync(int instanceId);
         Task<CompPlatformInstance> GetInstanceDraftAsync(int toolId, int questionnaireId);

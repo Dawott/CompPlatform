@@ -246,5 +246,12 @@ namespace Compliance_Platform.Repositories
                 .OrderByDescending(h => h.VerificationDate)
                 .ToListAsync();
         }
+
+        public async Task<int> AddToolAsync(CompPlatformTool tool)
+        {
+            _context.Tools.Add(tool);
+            await _context.SaveChangesAsync();
+            return tool.Id;
+        }
     }
 }
