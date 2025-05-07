@@ -7,16 +7,16 @@
 @inject NavigationManager NavigationManager
 @inject RoleManager<IdentityRole> RoleManager
 
-<PageTitle>Register</PageTitle>
+<PageTitle>Rejestracja</PageTitle>
 
 <div class="row">
     <div class="col-md-6 offset-md-3">
         <div class="card">
             <div class="card-header">
-                <h3>Register</h3>
+                <h3>Rejestracja</h3>
             </div>
             <div class="card-body">
-                <EditForm Model="@registerModel" OnValidSubmit="HandleRegistration">
+                <EditForm FormName="RegisterForm" Model="@registerModel" OnValidSubmit="HandleRegistration">
                     <DataAnnotationsValidator />
                     <ValidationSummary />
 

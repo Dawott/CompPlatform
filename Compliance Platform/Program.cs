@@ -31,6 +31,7 @@ builder.Services.AddIdentity<CompPlatformUser, IdentityRole>(options => {
 .AddDefaultTokenProviders()
 .AddEntityFrameworkStores<CompPlatformDbContext>();
 
+//Placeholder pod system autoryzacyjny na przysz³oœæ
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("RequireAdministratorRole",
@@ -64,12 +65,14 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
-app.UseAntiforgery();
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseAntiforgery();
+
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

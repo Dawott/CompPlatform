@@ -3,6 +3,7 @@
 @using Microsoft.AspNetCore.Identity
 @using Compliance_Platform.Model
 @using System.ComponentModel.DataAnnotations
+@using Microsoft.EntityFrameworkCore
 @inject UserManager<CompPlatformUser> UserManager
 @inject RoleManager<IdentityRole> RoleManager
 @attribute [Authorize(Roles = "Administrator")]
