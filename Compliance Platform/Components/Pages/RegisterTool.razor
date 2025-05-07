@@ -2,6 +2,7 @@
 @using Compliance_Platform.Model
 @using Compliance_Platform.Interfaces
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
 @inject IQuestionnaireRepository Repository
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager NavigationManager
@@ -84,6 +85,24 @@
     private async Task HandleValidSubmit()
     {
         
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+
+        //Sprawdzanie czy user jest zalogowany
+        if (!authState.User.Identity.IsAuthenticated)
+        {
+            // Redirect do strony z logowaniem
+            NavigationManager.NavigateTo("/login", true);
+            return;
+        }
+
+        currentUserId = authState.User.FindFirst(c => c.Type == "sub")?.Value;
+        /*if (string.IsNullOrEmpty(currentUserId))
+        {
+            errorMessage = "User identity is invalid. Please try logging in again.";
+            return;
+        }*/
+  
+
         StateHasChanged();
         try
         {
@@ -110,7 +129,7 @@
         catch (Exception ex)
         {
             // TBD - loger
-            Console.WriteLine($"Error creating tool: {ex.Message}");
+            Console.WriteLine($"Błąd podczas tworzenia: {ex.Message}");
         }
     }
 
@@ -127,7 +146,7 @@
         [System.ComponentModel.DataAnnotations.StringLength(1000, ErrorMessage = "Opis nie może być dłuższy niż 1000 znaków")]
         public string Opis { get; set; } = string.Empty;
 
-        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Data powstania jest wymagana")]
+        //[System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Data powstania jest wymagana")]
         public DateTime DataPowstania { get; set; }
 
         public string Status { get; set; } = string.Empty;

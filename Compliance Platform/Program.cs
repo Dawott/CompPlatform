@@ -4,7 +4,9 @@ using Compliance_Platform.Interfaces;
 using Compliance_Platform.Model;
 using Compliance_Platform.Repositories;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,6 +51,13 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.AccessDeniedPath = "/access-denied";
 });
 
+//Tymczasowe rozwi¹zanie - security issues
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add(new IgnoreAntiforgeryTokenAttribute());
+});
+
+
 builder.Services.AddScoped<IQuestionnaireRepository, QuestionnaireRepository>();
 builder.Services.AddScoped<IQuestionRepository, QuestionRepository>();
 builder.Services.AddScoped<QuestionnaireService>();
@@ -74,9 +83,11 @@ app.UseAuthorization();
 app.UseAntiforgery();
 
 
+
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-app.Run();
 
 await SeedData.Initialize(app.Services);
+
+app.Run();

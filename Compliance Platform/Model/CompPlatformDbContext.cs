@@ -1,8 +1,10 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 namespace Compliance_Platform.Model
 {
-    public class CompPlatformDbContext : DbContext
+    public class CompPlatformDbContext : IdentityDbContext<CompPlatformUser, IdentityRole, string>
     {
         public CompPlatformDbContext(DbContextOptions options) : base(options)
         {

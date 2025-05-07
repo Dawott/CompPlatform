@@ -1,0 +1,166 @@
+﻿@page "/simple-register-tool"
+@using System.ComponentModel.DataAnnotations
+@using Compliance_Platform.Model
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Forms
+@inject CompPlatformDbContext DbContext
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+@inject ILogger<SimplifiedRegisterTool> Logger
+
+<PageTitle>Simple Tool Registration</PageTitle>
+
+<div class="card">
+    <div class="card-header">
+        <h3>Simple Tool Registration</h3>
+    </div>
+    <div class="card-body">
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger">
+                <strong>Error:</strong> @errorMessage
+            </div>
+        }
+
+        @if (registrationSuccess)
+        {
+            <div class="alert alert-success">
+                <strong>Success!</strong> Tool registered with ID: @newToolId
+                <div class="mt-2">
+                    <a href="/questionnaire-select/@newToolId" class="btn btn-primary">
+                        Continue to Questionnaire
+                    </a>
+                </div>
+            </div>
+        }
+        else
+        {
+            <EditForm FormName="SimpleRegisterTool" Model="@newTool" OnValidSubmit="RegisterTool">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="mb-3">
+                    <label for="toolName" class="form-label">Tool Name</label>
+                    <InputText id="toolName" @bind-Value="newTool.Name" class="form-control" />
+                    <ValidationMessage For="@(() => newTool.Name)" />
+                </div>
+
+                <div class="mb-3">
+                    <label for="toolCategory" class="form-label">Category</label>
+                    <InputSelect id="toolCategory" @bind-Value="newTool.Category" class="form-select">
+                        <option value="">-- Select Category --</option>
+                        <option value="PrzeznaczenieOgolne">General Purpose</option>
+                        <option value="DiagnostykaMedyczna">Medical Diagnostics</option>
+                        <option value="Biometria">Biometrics</option>
+                        <option value="Profilowanie">Profiling</option>
+                        <option value="KrytycznaInfrastruktura">Critical Infrastructure</option>
+                        <option value="EgzekwowaniePrawa">Law Enforcement</option>
+                        <option value="OcenaEdukacji">Educational Assessment</option>
+                        <option value="OcenaZatrudnienia">Employment Assessment</option>
+                        <option value="Inne">Other</option>
+                    </InputSelect>
+                    <ValidationMessage For="@(() => newTool.Category)" />
+                </div>
+
+                <div class="mb-3">
+                    <label for="toolDescription" class="form-label">Description</label>
+                    <InputTextArea id="toolDescription" @bind-Value="newTool.Description" class="form-control" rows="4" />
+                    <ValidationMessage For="@(() => newTool.Description)" />
+                </div>
+
+                <div class="mt-4 d-flex justify-content-between">
+                    <a href="/tools" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary" disabled="@isRegistering">
+                        @if (isRegistering)
+                        {
+                            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            <span> Processing...</span>
+                        }
+                        else
+                        {
+                            <span>Register Tool</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+        }
+    </div>
+</div>
+
+@code {
+    public class SimpleToolModel
+    {
+        [Required(ErrorMessage = "Name is required")]
+        [StringLength(100, ErrorMessage = "Name cannot be longer than 100 characters")]
+        public string Name { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Category is required")]
+        public string Category { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Description is required")]
+        [StringLength(1000, ErrorMessage = "Description cannot be longer than 1000 characters")]
+        public string Description { get; set; } = string.Empty;
+    }
+
+    private SimpleToolModel newTool = new();
+    private string errorMessage = string.Empty;
+    private bool isRegistering = false;
+    private bool registrationSuccess = false;
+    private int newToolId = 0;
+    private string currentUserId;
+
+    
+
+    private async Task RegisterTool()
+    {
+       
+
+        isRegistering = true;
+        errorMessage = string.Empty;
+        registrationSuccess = false;
+        StateHasChanged();
+
+        try
+        {
+            // Create the entity from our view model
+            var toolEntity = new CompPlatformTool
+                {
+                    Nazwa = newTool.Name,
+                    Kategoria = newTool.Category,
+                    Opis = newTool.Description,
+                    DataPowstania = DateTime.Now,
+                    Status = "Draft",
+                    OwnerId = currentUserId
+                };
+
+            // Add to context and save
+            DbContext.Tools.Add(toolEntity);
+            await DbContext.SaveChangesAsync();
+
+            // Get the new ID
+            newToolId = toolEntity.Id;
+
+            if (newToolId > 0)
+            {
+                registrationSuccess = true;
+                Logger.LogInformation($"Tool registered successfully. ID: {newToolId}");
+            }
+            else
+            {
+                errorMessage = "Registration failed. No ID was returned from the database.";
+                Logger.LogError($"Tool registration failed. No ID returned.");
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"An error occurred: {ex.Message}";
+            Logger.LogError(ex, "Tool registration error");
+        }
+        finally
+        {
+            isRegistering = false;
+            StateHasChanged();
+        }
+    }
+}
