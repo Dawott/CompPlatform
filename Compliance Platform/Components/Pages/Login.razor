@@ -18,7 +18,9 @@
                 <h3>Logowanie</h3>
             </div>
             <div class="card-body">
-                <EditForm FormName="LoginForm" Model="@loginModel" OnValidSubmit="HandleLogin">
+                <EditForm FormName="LoginForm" Model="@loginModel" OnValidSubmit="HandleLogin"
+                        @* EditContext="@editContext" OnSubmit="PreventDefaultSubmit" *@
+                >
                     <DataAnnotationsValidator />
                     <ValidationSummary />
 
@@ -47,7 +49,7 @@
                     </div>
 
                     <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-primary">Zaloguj</button>
+                        <button type="submit" class="btn btn-primary" disabled="@isProcessing">@(isProcessing ? "Ładowanie..." : "Zaloguj")</button>
                     </div>
                 </EditForm>
 
@@ -63,10 +65,25 @@
 @code {
     private LoginModel loginModel = new();
     private string errorMessage = string.Empty;
+    //private EditContext editContext;
+    private bool isProcessing = false;
+
+    /*
+    protected override void OnInitialized()
+    {
+        editContext = new EditContext(loginModel);
+        base.OnInitialized();
+    }
+    */
 
     private async Task HandleLogin()
     {
         try{
+            if (isProcessing) return;
+
+            isProcessing = true;
+            StateHasChanged();
+
             var result = await SignInManager.PasswordSignInAsync(
                 loginModel.Email,
                 loginModel.Password,
@@ -88,6 +105,11 @@
             errorMessage = $"Błąd: {ex.Message}";
             StateHasChanged();
             Console.WriteLine(ex);
+        }
+        finally
+        {
+            isProcessing = false;
+            StateHasChanged();
         }
     }
 
