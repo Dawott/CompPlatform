@@ -81,7 +81,7 @@ else
                         <button type="button" class="btn-close" @onclick="CloseUserModal"></button>
                     </div>
                     <div class="modal-body">
-                        <EditForm Model="@editingUser" OnValidSubmit="SaveUser">
+                        <EditForm FormName="UserManager" Model="@editingUser" OnValidSubmit="SaveUser">
                             <DataAnnotationsValidator />
                             <ValidationSummary />
 

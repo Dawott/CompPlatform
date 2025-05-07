@@ -97,30 +97,39 @@
             errorMessage = "Hasło i potwierdzenie hasła nie pasują.";
             return;
         }
+        try
+        {
+            var user = new CompPlatformUser
+                {
+                    UserName = registerModel.Email,
+                    Email = registerModel.Email,
+                    Imie = registerModel.Imie,
+                    Nazwisko = registerModel.Nazwisko,
+                    Departament = registerModel.Departament,
+                    Rola = registerModel.Rola
+                };
 
-        var user = new CompPlatformUser
+            var result = await UserManager.CreateAsync(user, registerModel.Password);
+
+            if (result.Succeeded)
             {
-                UserName = registerModel.Email,
-                Email = registerModel.Email,
-                Imie = registerModel.Imie,
-                Nazwisko = registerModel.Nazwisko,
-                Departament = registerModel.Departament,
-                Rola = registerModel.Rola
-            };
+                // Add user to appropriate role
+                await UserManager.AddToRoleAsync(user, registerModel.Rola);
 
-        var result = await UserManager.CreateAsync(user, registerModel.Password);
-
-        if (result.Succeeded)
-        {
-            // Add user to appropriate role
-            await UserManager.AddToRoleAsync(user, registerModel.Rola);
-
-            await SignInManager.SignInAsync(user, isPersistent: false);
-            NavigationManager.NavigateTo("/");
+                await SignInManager.SignInAsync(user, isPersistent: false);
+                NavigationManager.NavigateTo("/");
+            }
+            else
+            {
+                errorMessage = string.Join(", ", result.Errors.Select(e => e.Description));
+                StateHasChanged();
+            }
         }
-        else
+        catch (Exception ex)
         {
-            errorMessage = string.Join(", ", result.Errors.Select(e => e.Description));
+            errorMessage = $"Wystąpił błąd podczas rejestracji: {ex.Message}";
+            StateHasChanged();
+            Console.WriteLine(ex);
         }
     }
 

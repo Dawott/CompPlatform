@@ -66,19 +66,28 @@
 
     private async Task HandleLogin()
     {
-        var result = await SignInManager.PasswordSignInAsync(
-            loginModel.Email,
-            loginModel.Password,
-            loginModel.RememberMe,
-            lockoutOnFailure: false);
+        try{
+            var result = await SignInManager.PasswordSignInAsync(
+                loginModel.Email,
+                loginModel.Password,
+                loginModel.RememberMe,
+                lockoutOnFailure: false);
 
-        if (result.Succeeded)
-        {
-            NavigationManager.NavigateTo("/");
+            if (result.Succeeded)
+            {
+                NavigationManager.NavigateTo("/");
+            }
+            else
+            {
+                errorMessage = "Błąd logowania!";
+                StateHasChanged();
+            }
         }
-        else
+        catch (Exception ex)
         {
-            errorMessage = "Błąd logowania!";
+            errorMessage = $"Błąd: {ex.Message}";
+            StateHasChanged();
+            Console.WriteLine(ex);
         }
     }
 
