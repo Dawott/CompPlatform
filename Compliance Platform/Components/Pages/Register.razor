@@ -1,11 +1,14 @@
 ﻿@page "/register"
 @using Microsoft.AspNetCore.Identity
 @using Compliance_Platform.Model
+@using Microsoft.AspNetCore.Components.Forms;
 @using System.ComponentModel.DataAnnotations
 @inject UserManager<CompPlatformUser> UserManager
 @inject SignInManager<CompPlatformUser> SignInManager
 @inject NavigationManager NavigationManager
 @inject RoleManager<IdentityRole> RoleManager
+@inject ILogger<Register> Logger
+@rendermode InteractiveServer
 
 <PageTitle>Rejestracja</PageTitle>
 
@@ -89,17 +92,19 @@
 @code {
     private RegisterModel registerModel = new();
     private string errorMessage = string.Empty;
+    private List<string> registrationErrors = new();
 
     private async Task HandleRegistration()
     {
-        Console.WriteLine("HandleLogin called");
+        registrationErrors.Clear();
+        Logger.LogInformation("Proces rejestracji rozpoczęty dla {Email}", registerModel.Email);
+        //Console.WriteLine("HandleLogin called");
         if (registerModel.Password != registerModel.ConfirmPassword)
         {
             errorMessage = "Hasło i potwierdzenie hasła nie pasują.";
             return;
         }
-        try
-        {
+       
             var user = new CompPlatformUser
                 {
                     UserName = registerModel.Email,
@@ -109,26 +114,67 @@
                     Departament = registerModel.Departament,
                     Rola = registerModel.Rola
                 };
+            Logger.LogDebug("Próba utworzenia użytkownika: UserName={UserName}, Email={Email}, Imie={Imie}, Nazwisko={Nazwisko}, Rola={Rola}",
+    user.UserName, user.Email, user.Imie, user.Nazwisko, user.Rola);
 
-            var result = await UserManager.CreateAsync(user, registerModel.Password);
-
-            if (result.Succeeded)
+            try
             {
-                // Add user to appropriate role
-                await UserManager.AddToRoleAsync(user, registerModel.Rola);
+                Logger.LogInformation("Wywołanie UserManager.CreateAsync dla {Email}", user.Email);
+                var result = await UserManager.CreateAsync(user, registerModel.Password);
+                Logger.LogInformation("UserManager.CreateAsync zakończone dla {Email}. Powodzenie: {Succeeded}", user.Email, result.Succeeded);
 
-                await SignInManager.SignInAsync(user, isPersistent: false);
-                NavigationManager.NavigateTo("/");
-            }
-            else
-            {
-                errorMessage = string.Join(", ", result.Errors.Select(e => e.Description));
-                StateHasChanged();
-            }
-        }
+                if (result.Succeeded)
+                {
+                    Logger.LogInformation("Użytkownik {Email} utworzony pomyślnie. Próba przypisania roli {Role}", user.Email, user.Rola);
+                    bool roleExists = await RoleManager.RoleExistsAsync(user.Rola);
+                    Logger.LogInformation("Rola {Role} istnieje: {Exists}", user.Rola, roleExists);
+                    if(roleExists)
+                    {
+                        var roleResult = await UserManager.AddToRoleAsync(user, user.Rola);
+                        if (roleResult.Succeeded)
+                        {
+                            Logger.LogInformation("Pomyślnie przypisano rolę {Role} do użytkownika {Email}", user.Rola, user.Email);
+                        }
+                        else
+                        {
+                            Logger.LogError("Nie udało się przypisać roli {Role} do użytkownika {Email}", user.Rola, user.Email);
+                            foreach (var error in roleResult.Errors)
+                            {
+                                Logger.LogError("Błąd przypisania roli: {Code} - {Description}", error.Code, error.Description);
+                                registrationErrors.Add($"Błąd przypisania roli: {error.Description}");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Logger.LogError("Rola {Role} nie istnieje. Nie można przypisać do użytkownika {Email}", user.Rola, user.Email);
+                        registrationErrors.Add($"Błąd: Rola '{user.Rola}' nie istnieje w systemie.");
+                    }
+                    if (!registrationErrors.Any())
+                    {
+                        Logger.LogInformation("Rejestracja i przypisanie roli pomyślne dla {Email}. Przekierowanie do logowania.", user.Email);
+                        NavigationManager.NavigateTo("/login", forceLoad: true);
+                    }
+                    else
+                    {
+                        Logger.LogWarning("Rejestracja zakończona dla {Email}, ale wystąpiły błędy w krokach po utworzeniu.", user.Email);
+                    }
+                }
+                else
+                {
+                    Logger.LogWarning("UserManager.CreateAsync nie powiodło się dla {Email}.", user.Email);
+                    foreach (var error in result.Errors)
+                    {
+                        // *** Loguj *każdy* błąd Identity ***
+                        Logger.LogError("Błąd rejestracji dla {Email}: {Code} - {Description}", user.Email, error.Code, error.Description);
+                        registrationErrors.Add(error.Description);
+                    }
+                }     
+            }         
         catch (Exception ex)
         {
-            errorMessage = $"Wystąpił błąd podczas rejestracji: {ex.Message}";
+                Logger.LogError(ex, "Wystąpił nieoczekiwany wyjątek podczas procesu rejestracji dla {Email}", registerModel.Email);
+                registrationErrors.Add($"Wystąpił krytyczny błąd serwera podczas rejestracji: {ex.GetType().Name}. Skontaktuj się z administratorem.");
             StateHasChanged();
             Console.WriteLine(ex);
         }

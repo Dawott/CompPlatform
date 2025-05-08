@@ -8,7 +8,7 @@
 @inject SignInManager<CompPlatformUser> SignInManager
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthStateProvider
-
+@*@rendermode InteractiveServer*@
 
 
 <PageTitle>Logowanie</PageTitle>
@@ -23,6 +23,8 @@
                 @if(editContext != null)
                 {
                 <EditForm EditContext="@editContext" OnValidSubmit="@HandleValidFormSubmit" OnInvalidSubmit="@HandleInvalidFormSubmit" @*@onsubmit:preventDefault*@ FormName="LoginForm">
+                        
+                    
                     <DataAnnotationsValidator />
                     @* <ValidationSummary /> *@
 
@@ -53,10 +55,10 @@
                         <InputCheckbox id="rememberMe" @bind-Value="loginModel.RememberMe" class="form-check-input" />
                         <label class="form-check-label" for="rememberMe">Zapamiętaj mnie</label>
                     </div>
-
-                    <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-primary" disabled="@isProcessing">@(isProcessing ? "Ładowanie..." : "Zaloguj")</button>
-                    </div>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary" disabled="@isProcessing">@(isProcessing ? "Ładowanie..." : "Zaloguj")</button>
+                        </div>
+                    
                     </EditForm>
                 }
                 else
