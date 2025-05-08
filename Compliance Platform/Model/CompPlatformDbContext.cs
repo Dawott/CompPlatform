@@ -10,7 +10,7 @@ namespace Compliance_Platform.Model
         {
         }
 
-        public DbSet<CompPlatformUser> Users { get; set; }
+       // public DbSet<CompPlatformUser> Users { get; set; }
         public DbSet<CompPlatformTool> Tools { get; set; }
         public DbSet<CompPlatformQuestions> Questions { get; set; }
         public DbSet<CompPlatformQuestionnaires> Questionnaires { get; set;}

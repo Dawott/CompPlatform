@@ -57,7 +57,6 @@ builder.Services.AddControllers(options =>
     options.Filters.Add(new IgnoreAntiforgeryTokenAttribute());
 });
 
-
 builder.Services.AddScoped<IQuestionnaireRepository, QuestionnaireRepository>();
 builder.Services.AddScoped<IQuestionRepository, QuestionRepository>();
 builder.Services.AddScoped<QuestionnaireService>();
@@ -66,6 +65,7 @@ builder.Services.AddScoped<RiskCalculationService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 
 var app = builder.Build();
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
@@ -74,7 +74,6 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
@@ -82,12 +81,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
 
-
-
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-
-await SeedData.Initialize(app.Services);
+//await SeedData.Initialize(app.Services);
 
 app.Run();
