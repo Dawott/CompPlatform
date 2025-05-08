@@ -84,7 +84,7 @@
 
     private async Task HandleValidSubmit()
     {
-        
+        Console.WriteLine("HandleLogin called");
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
 
         //Sprawdzanie czy user jest zalogowany

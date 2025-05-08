@@ -92,6 +92,7 @@
 
     private async Task HandleRegistration()
     {
+        Console.WriteLine("HandleLogin called");
         if (registerModel.Password != registerModel.ConfirmPassword)
         {
             errorMessage = "Hasło i potwierdzenie hasła nie pasują.";
