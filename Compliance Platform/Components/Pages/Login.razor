@@ -9,6 +9,7 @@
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthStateProvider
 @inject ILogger<Login> Logger
+@inject IHttpContextAccessor HttpContextAccessor
 @rendermode InteractiveServer
 
 <PageTitle>Logowanie</PageTitle>
@@ -40,7 +41,7 @@
                         <InputText id="email" @bind-Value="loginModel.Email" class="form-control" />
                         <ValidationMessage For="@(() => loginModel.Email)" class="text-danger" />
                         @* --- DEBUG LINE: Display bound email value directly in UI --- *@
-                        <p class="form-text text-muted small mt-1">DEBUG UI: Model.Email = "@loginModel.Email"</p>
+                        @*<p class="form-text text-muted small mt-1">DEBUG UI: Model.Email = "@loginModel.Email"</p>*@
                     </div>
 
                     <div class="mb-3">
@@ -48,7 +49,7 @@
                         <InputText id="password" type="password" @bind-Value="loginModel.Password" class="form-control" />
                         <ValidationMessage For="@(() => loginModel.Password)" class="text-danger" />
                         @* --- DEBUG LINE: Display if password is empty directly in UI --- *@
-                        <p class="form-text text-muted small mt-1">DEBUG UI: Model.Password is empty = @(string.IsNullOrEmpty(loginModel.Password))</p>
+                        @*<p class="form-text text-muted small mt-1">DEBUG UI: Model.Password is empty = @(string.IsNullOrEmpty(loginModel.Password))</p>*@
                     </div>
 
                     <div class="mb-3 form-check">
@@ -106,7 +107,7 @@
     {
         Logger.LogWarning("====== HandleValidFormSubmit WYWOŁANE ======");
         Logger.LogInformation("HandleValidFormSubmit Start. Email: '{Email}', Posiada hasło: {HasPassword}", loginModel.Email, !string.IsNullOrEmpty(loginModel.Password));
-        Logger.LogDebug("Current Model HashCode: {CurrentHash} (Initial was: {InitialHash})", loginModel.GetHashCode(), loginModelHashCodeOnInit);
+        //Logger.LogDebug("Current Model HashCode: {CurrentHash} (Initial was: {InitialHash})", loginModel.GetHashCode(), loginModelHashCodeOnInit);
         loginErrors.Clear();
         await HandleLogin();
     }
@@ -135,11 +136,22 @@
     {
         Logger.LogWarning("====== HandleLogin WYWOŁANE ======");
         isProcessing = true;
-        StateHasChanged();
+        //StateHasChanged();
         Logger.LogInformation("Próba logowania użytkownika: {Email}", loginModel.Email);
 
         try
         {
+            //Debug
+            var httpContext = HttpContextAccessor.HttpContext;
+            if (httpContext != null && httpContext.Response.HasStarted)
+            {
+                Logger.LogWarning("ODPOWIEDŹ JUŻ ROZPOCZĘTA PRZED PasswordSignInAsync!");                
+            }
+            else
+            {
+                Logger.LogInformation("Odpowiedź NIE została jeszcze rozpoczęta przed PasswordSignInAsync.");
+            }
+
             // Email jako nazwy użytkownika do logowania
             var result = await SignInManager.PasswordSignInAsync(loginModel.Email, loginModel.Password, loginModel.RememberMe, lockoutOnFailure: true);
 
@@ -149,7 +161,7 @@
             if (result.Succeeded)
             {
                 Logger.LogInformation("Logowanie użytkownika {Email} zakończone sukcesem.", loginModel.Email);
-                NavigationManager.NavigateTo("/", forceLoad: true); // (forceLoad może pomóc odświeżyć stan autoryzacji)
+                NavigationManager.NavigateTo("/", true); // (forceLoad może pomóc odświeżyć stan autoryzacji)
             }
             else if (result.IsLockedOut)
             {
@@ -195,7 +207,7 @@
             if (result.Succeeded)
             {
                 Logger.LogInformation("Logowanie demo jako Admin zakończone sukcesem.");
-                NavigationManager.NavigateTo("/", forceLoad: true);
+                NavigationManager.NavigateTo("/", true);
             }
             else
             {

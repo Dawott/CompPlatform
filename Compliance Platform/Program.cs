@@ -50,6 +50,7 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.LoginPath = "/login";
     options.LogoutPath = "/logout";
     options.AccessDeniedPath = "/access-denied";
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
 });
 
 //Tymczasowe rozwi¹zanie - security issues
@@ -64,6 +65,8 @@ builder.Services.AddScoped<QuestionnaireService>();
 builder.Services.AddScoped<QuestionnaireState>();
 builder.Services.AddScoped<RiskCalculationService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
+
+builder.Services.AddHttpContextAccessor();
 
 builder.Host.UseSerilog((ctx, lc) => lc.WriteTo.Console().ReadFrom.Configuration(ctx.Configuration));
 
