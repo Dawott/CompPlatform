@@ -173,8 +173,8 @@ else
     [Parameter] public int ToolId { get; set; }
 
     private bool isLoading = true;
-    private bool isAuditor = false;
-    private bool isToolOwner = false;
+    private bool isAuditor = true; //Do dema
+    private bool isToolOwner = true; //Do dema
     private string currentUserId;
     private CompPlatformTool tool;
     private CompPlatformInstance latestInstance;
@@ -185,12 +185,12 @@ else
         isLoading = true;
 
         // Pobierz użytkownika i rolę
-        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
+        //var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        //var user = authState.User;
 
         // Sprawdź użytkownika
-        isAuditor = user.IsInRole("Audytor");
-        currentUserId = user.FindFirst(c => c.Type == "sub")?.Value;
+        //isAuditor = user.IsInRole("Audytor");
+        //currentUserId = user.FindFirst(c => c.Type == "sub")?.Value;
 
         // Załaduj dane narzędzia
         await LoadToolDataAsync();
@@ -205,8 +205,8 @@ else
 
         if (tool != null)
         {
-            // Sprawdź czy użytkownik jest właścicielem
-            isToolOwner = tool.OwnerId == currentUserId;
+            // Sprawdź czy użytkownik jest właścicielem - do dema blokowane
+            //isToolOwner = tool.OwnerId == currentUserId;
 
             // Pobierz wszystkie instancje kwestionariuszy
             instances = await Repository.GetInstancesByToolAsync(ToolId);

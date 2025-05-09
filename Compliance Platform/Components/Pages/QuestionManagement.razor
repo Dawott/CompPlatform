@@ -2,8 +2,11 @@
 @using Compliance_Platform.Interfaces
 @using Compliance_Platform.Model
 @using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.EntityFrameworkCore
+@inject CompPlatformDbContext DbContext
 @inject IQuestionRepository QuestionRepository
 @inject AuthenticationStateProvider AuthStateProvider
+@rendermode InteractiveServer
 
 <PageTitle>Zarządzanie pytaniami</PageTitle>
 
@@ -16,17 +19,21 @@
         <p>Ładowanie danych...</p>
     </div>
 }
+@*Do dema
 else if (!isAuditor)
 {
     <div class="alert alert-danger">
         Brak uprawnień do zarządzania pytaniami.
     </div>
-}
+}*@
 else
 {
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h3>Zarządzanie pytaniami kwestionariusza</h3>
+            <button class="btn btn-outline-primary me-2" @onclick="ShowQuestionnaireModal">
+                <i class="bi bi-file-earmark-plus"></i> Nowy wzór
+            </button>
             <button class="btn btn-primary" @onclick="() => ShowQuestionModal(null)">
                 <i class="bi bi-plus-circle"></i> Dodaj nowe pytanie
             </button>
@@ -34,7 +41,19 @@ else
         <div class="card-body">
             <div class="mb-3">
                 <div class="row">
-                    <div class="col-md-6">
+                    <div class="col-md-4">
+                        <div class="form-group mb-3">
+                            <label for="questionnaireFilter">Kwestionariusz:</label>
+                            <select class="form-select" id="questionnaireFilter" @bind="selectedQuestionnaireId">
+                                <option value="0">Wszystkie kwestionariusze</option>
+                                @foreach (var questionnaire in questionnaires)
+                                {
+                                    <option value="@questionnaire.Id">@questionnaire.Nazwa</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
                         <div class="form-group">
                             <label for="categoryFilter">Filtruj po kategorii:</label>
                             <select class="form-select" id="categoryFilter" @bind="selectedCategory">
@@ -49,7 +68,7 @@ else
                             </select>
                         </div>
                     </div>
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <div class="form-group">
                             <label for="typeFilter">Filtruj po typie pytania:</label>
                             <select class="form-select" id="typeFilter" @bind="selectedType">
@@ -62,6 +81,7 @@ else
                     </div>
                 </div>
             </div>
+
 
             @if (!filteredQuestions.Any())
             {
@@ -90,6 +110,7 @@ else
                                 <tr>
                                     <td>@question.OrderIndex</td>
                                     <td>@(question.Tresc?.Length > 50 ? question.Tresc?.Substring(0, 47) + "..." : question.Tresc)</td>
+                                    <td>@GetQuestionnaireName(question.QuestionnaireId)</td>
                                     <td>@GetCategoryDisplayName(question.Kategoria)</td>
                                     <td>@question.TypPytania</td>
                                     <td>@question.WagaRyzyka.ToString("F2")</td>
@@ -143,6 +164,21 @@ else
                                 <InputTextArea id="questionText" class="form-control" @bind-Value="editingQuestion.Tresc" rows="3" />
                             </div>
 
+                            <div class="form-group mb-3">
+                                <label for="questionnaireId">Kwestionariusz:</label>
+                                <div class="input-group">
+                                    <InputSelect id="questionnaireId" class="form-select" @bind-Value="editingQuestion.QuestionnaireId">
+                                        @foreach (var q in questionnaires)
+                                        {
+                                            <option value="@q.Id">@q.Nazwa</option>
+                                        }
+                                    </InputSelect>
+                                    <button class="btn btn-outline-secondary" type="button" @onclick="ShowQuestionnaireModal">
+                                        <i class="bi bi-plus-circle"></i> Nowy
+                                    </button>
+                                </div>
+                            </div>
+
                             <div class="row mb-3">
                                 <div class="col-md-6">
                                     <div class="form-group">
@@ -192,14 +228,52 @@ else
                                 </label>
                             </div>
 
+                            <div class="text-end">
+                                <button type="button" class="btn btn-secondary me-2" @onclick="CloseQuestionModal">Anuluj</button>
+                                <button type="submit" class="btn btn-primary">Zapisz</button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-backdrop fade show"></div>
+    }
+
+    @if (showQuestionnaireModal)
+    {
+        <div class="modal fade show" style="display:block;" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Nowy kwestionariusz</h5>
+                        <button type="button" class="btn-close" @onclick="CloseQuestionnaireModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <EditForm Model="@newQuestionnaire" OnValidSubmit="SaveQuestionnaire">
+                            <DataAnnotationsValidator />
+
                             <div class="form-group mb-3">
-                                <label for="questionnaireId">Przypisz do kwestionariusza:</label>
-                                <InputNumber id="questionnaireId" class="form-control" @bind-Value="editingQuestion.QuestionnaireId" />
-                                <small class="text-muted">ID kwestionariusza, do którego pytanie będzie przypisane</small>
+                                <label for="questionnaireName">Nazwa kwestionariusza:</label>
+                                <InputText id="questionnaireName" class="form-control" @bind-Value="newQuestionnaire.Nazwa" />
+                                <ValidationMessage For="@(() => newQuestionnaire.Nazwa)" />
+                            </div>
+
+                            <div class="form-group mb-3">
+                                <label for="questionnaireDesc">Opis:</label>
+                                <InputTextArea id="questionnaireDesc" class="form-control" @bind-Value="newQuestionnaire.Opis" rows="3" />
+                                <ValidationMessage For="@(() => newQuestionnaire.Opis)" />
+                            </div>
+
+                            <div class="form-check mb-3">
+                                <InputCheckbox id="questionnaireActive" class="form-check-input" @bind-Value="newQuestionnaire.Aktywny" />
+                                <label class="form-check-label" for="questionnaireActive">
+                                    Kwestionariusz aktywny
+                                </label>
                             </div>
 
                             <div class="text-end">
-                                <button type="button" class="btn btn-secondary me-2" @onclick="CloseQuestionModal">Anuluj</button>
+                                <button type="button" class="btn btn-secondary me-2" @onclick="CloseQuestionnaireModal">Anuluj</button>
                                 <button type="submit" class="btn btn-primary">Zapisz</button>
                             </div>
                         </EditForm>
@@ -340,17 +414,24 @@ else
 
 @code {
     private bool isLoading = true;
-    private bool isAuditor = false;
+    private bool isAuditor = true; //Do dema
     private List<CompPlatformQuestions> questions = new();
     private List<CompPlatformAnswers> answers = new();
+    private List<CompPlatformQuestionnaires> questionnaires = new();
+    private string currentUserId = "f0a0ce38-b164-4bc0-828e-a8a6b2fa0d6a"; //Do dema
 
     // Filtry
     private string selectedCategory = "";
     private string selectedType = "";
+    private int selectedQuestionnaireId = 0;
 
     // Edycja pytania
     private bool showQuestionModal = false;
     private CompPlatformQuestions editingQuestion = new();
+
+    // Edycja wzorca kwestionariusza
+    private bool showQuestionnaireModal = false;
+    private CompPlatformQuestionnaires newQuestionnaire = new();
 
     // Odpowiedzi
     private bool showAnswersModal = false;
@@ -362,6 +443,7 @@ else
 
     // Filtrowane pytania
     private List<CompPlatformQuestions> filteredQuestions => questions
+    .Where(q => selectedQuestionnaireId == 0 || q.QuestionnaireId == selectedQuestionnaireId)
         .Where(q => string.IsNullOrEmpty(selectedCategory) || q.Kategoria == selectedCategory)
         .Where(q => string.IsNullOrEmpty(selectedType) || q.TypPytania == selectedType)
         .OrderBy(q => q.OrderIndex)
@@ -370,19 +452,23 @@ else
     protected override async Task OnInitializedAsync()
     {
         isLoading = true;
+        //Uproszczenie do dema
+        
 
         // Sprawdź uprawnienia
+        /*
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
 
         isAuditor = user.IsInRole("Audytor");
-
+        */
         if (isAuditor)
         {
+            questionnaires = await DbContext.Questionnaires.ToListAsync();
             // Pobierz wszystkie pytania
             questions = await QuestionRepository.GetAllQuestionsAsync();
         }
-
+        
         isLoading = false;
     }
 
@@ -398,7 +484,7 @@ else
                     OrderIndex = questions.Count > 0 ? questions.Max(q => q.OrderIndex) + 1 : 1,
                     WagaRyzyka = 1.0m,
                     Wymagane = true,
-                    QuestionnaireId = 1 // Domyślny kwestionariusz
+                    QuestionnaireId = questionnaires.FirstOrDefault()?.Id ?? 0 //Domyślny istniejący
                 };
         }
         else
@@ -450,6 +536,56 @@ else
         }
 
         showQuestionModal = false;
+    }
+
+    private void ShowQuestionnaireModal()
+    {
+        newQuestionnaire = new CompPlatformQuestionnaires
+            {
+                Nazwa = "",
+                Opis = "",
+                Aktywny = true,
+                DataUtworzenia = DateTime.Now,
+                CreatedById = currentUserId
+            };
+
+        showQuestionnaireModal = true;
+    }
+
+    private void CloseQuestionnaireModal()
+    {
+        showQuestionnaireModal = false;
+    }
+
+    private async Task SaveQuestionnaire()
+    {
+        try
+        {
+            // Dodaj nowy kwestionariusz
+            DbContext.Questionnaires.Add(newQuestionnaire);
+            await DbContext.SaveChangesAsync();
+
+            // Odśwież listę kwestionariuszy
+            questionnaires = await DbContext.Questionnaires.ToListAsync();
+
+            // Jeśli edytujemy pytanie, ustaw nowy kwestionariusz
+            if (showQuestionModal)
+            {
+                editingQuestion.QuestionnaireId = newQuestionnaire.Id;
+            }
+
+            showQuestionnaireModal = false;
+        }
+        catch (Exception ex)
+        {
+            // Obsługa błędu
+            Console.WriteLine($"Błąd podczas zapisywania kwestionariusza: {ex.Message}");
+        }
+    }
+
+    private string GetQuestionnaireName(int questionnaireId)
+    {
+        return questionnaires.FirstOrDefault(q => q.Id == questionnaireId)?.Nazwa ?? "Brak kwestionariusza";
     }
 
     private async Task ShowAnswersModal(CompPlatformQuestions question)

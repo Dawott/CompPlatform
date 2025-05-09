@@ -12,7 +12,7 @@ namespace Compliance_Platform.Model
     public DateTime DataUtworzenia { get; set; }
 
     [ForeignKey("CreatedById")]
-    public string CreatedById { get; set; }
+    public string? CreatedById { get; set; }
 
     public virtual CompPlatformUser CreatedBy { get; set; }
     public virtual ICollection<CompPlatformQuestions> Questions { get; set; }

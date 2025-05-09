@@ -3,9 +3,12 @@
 @using Compliance_Platform.Interfaces
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.EntityFrameworkCore
 @inject IQuestionnaireRepository Repository
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+@inject CompPlatformDbContext DbContext
 
 <PageTitle>Rejestracja nowego narzędzia AI</PageTitle>
 
@@ -53,7 +56,15 @@
                 <InputDate @bind-Value="newTool.DataPowstania" class="form-control" />
                 <ValidationMessage For="@(() => newTool.DataPowstania)" />
             </div>
-
+            <div class="mb-3">
+                <label for="demoUser" class="form-label">Właściciel (Demo)</label>
+                <InputSelect id="demoUser" @bind-Value="selectedUserId" class="form-select">
+                    @foreach (var user in availableUsers)
+                    {
+                        <option value="@user.Id">@user.Email (@user.Imie @user.Nazwisko)</option>
+                    }
+                </InputSelect>
+            </div>
             <div class="mt-4 d-flex justify-content-between">
                 <a href="/tools" class="btn btn-secondary">Anuluj</a>
                 <button type="submit" class="btn btn-primary">Zarejestruj narzędzie</button>
@@ -69,41 +80,48 @@
             Status = "Draft"
         };
 
-    private string currentUserId;
+    private string selectedUserId = string.Empty;
+    private List<CompPlatformUser> availableUsers = new();
     private bool isLoading = true;
+    private string errorMessage = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
         // Pobierz zalogowanego użytkownika
-        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
-        currentUserId = user.FindFirst(c => c.Type == "sub")?.Value;
+        //var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        //var user = authState.User;
+        //currentUserId = user.FindFirst(c => c.Type == "sub")?.Value;
+
+        //Na potrzeby dema - ściąganie userów
+        availableUsers = await DbContext.Users.ToListAsync();
+
+        if (availableUsers.Any())
+        {
+            selectedUserId = availableUsers.First().Id;
+        }
 
         isLoading = false;
     }
 
     private async Task HandleValidSubmit()
     {
-        Console.WriteLine("HandleLogin called");
-        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        //var authState = await AuthStateProvider.GetAuthenticationStateAsync();
 
         //Sprawdzanie czy user jest zalogowany
-        if (!authState.User.Identity.IsAuthenticated)
-        {
+        /*if (!authState.User.Identity.IsAuthenticated)
+            {
             // Redirect do strony z logowaniem
             NavigationManager.NavigateTo("/login", true);
-            return;
-        }
+        return;
+        }*/
 
-        currentUserId = authState.User.FindFirst(c => c.Type == "sub")?.Value;
-        /*if (string.IsNullOrEmpty(currentUserId))
+        //currentUserId = authState.User.FindFirst(c => c.Type == "sub")?.Value;
+        if (string.IsNullOrEmpty(selectedUserId))
         {
             errorMessage = "User identity is invalid. Please try logging in again.";
             return;
-        }*/
-  
+        }
 
-        StateHasChanged();
         try
         {
             // Utwórz nową encję
@@ -114,7 +132,7 @@
                     Kategoria = newTool.Kategoria,
                     DataPowstania = newTool.DataPowstania,
                     Status = "Draft",
-                    OwnerId = currentUserId
+                    OwnerId = selectedUserId
                 };
 
             // Zapisz narzędzie w bazie
@@ -123,7 +141,7 @@
             // Po zapisie nawiguj do
             if (toolId > 0)
             {
-                NavigationManager.NavigateTo($"/questionnaire-select/{toolId}");
+                NavigationManager.NavigateTo($"/questionnaire-select/{toolId}", true);
             }
         }
         catch (Exception ex)
@@ -131,6 +149,7 @@
             // TBD - loger
             Console.WriteLine($"Błąd podczas tworzenia: {ex.Message}");
         }
+        
     }
 
     private class ToolRegistrationModel

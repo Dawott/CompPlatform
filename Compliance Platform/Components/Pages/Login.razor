@@ -132,6 +132,11 @@
         StateHasChanged();
     }
 
+    public class LoginResult
+    {
+        public bool succeeded { get; set; }
+    }
+
     private async Task HandleLogin()
     {
         Logger.LogWarning("====== HandleLogin WYWOŁANE ======");
@@ -154,7 +159,11 @@
 
             // Email jako nazwy użytkownika do logowania
             var result = await SignInManager.PasswordSignInAsync(loginModel.Email, loginModel.Password, loginModel.RememberMe, lockoutOnFailure: true);
-
+            /*
+            var client = HttpClientFactory.CreateClient("LocalAPI");
+            var response = await client.PostAsJsonAsync("api/auth/login", loginModel);
+            var result = await response.Content.ReadFromJsonAsync<LoginResult>();
+            */
             Logger.LogInformation("Wynik logowania dla {Email}: Powodzenie={Succeeded}, Zablokowany={IsLockedOut}, Niedozwolony={IsNotAllowed}",
                 loginModel.Email, result.Succeeded, result.IsLockedOut, result.IsNotAllowed);
 
@@ -163,7 +172,8 @@
                 Logger.LogInformation("Logowanie użytkownika {Email} zakończone sukcesem.", loginModel.Email);
                 NavigationManager.NavigateTo("/", true); // (forceLoad może pomóc odświeżyć stan autoryzacji)
             }
-            else if (result.IsLockedOut)
+            
+                        else if (result.IsLockedOut)
             {
                 Logger.LogWarning("Konto użytkownika {Email} jest zablokowane.", loginModel.Email);
                 loginErrors.Add("Twoje konto jest tymczasowo zablokowane z powodu zbyt wielu nieudanych prób logowania.");
@@ -198,11 +208,11 @@
         isProcessing = true;
         try
         {
-        // Pre-fill na potrzeby dema - NIE NA PROD
-        var demoEmail = "admin@example.com";
-        var demoPassword = "Admin123!";        
+            // Pre-fill na potrzeby dema - NIE NA PROD
+            var demoEmail = "admin@example.com";
+            var demoPassword = "Admin123!";        
 
-        var result = await SignInManager.PasswordSignInAsync(demoEmail, demoPassword, isPersistent: false, lockoutOnFailure: false);
+            var result = await SignInManager.PasswordSignInAsync(demoEmail, demoPassword, isPersistent: false, lockoutOnFailure: false);
 
             if (result.Succeeded)
             {
@@ -223,6 +233,7 @@
         finally
         {
             isProcessing = false;
+            StateHasChanged();
         }
     } 
 }

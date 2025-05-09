@@ -207,7 +207,7 @@ else
 
     private bool isLoading = true;
     private bool showRiskValues = false;
-    private bool isAuditor = false;
+    private bool isAuditor = true; //Do dema
     private bool isToolOwner = false;
     private bool showHistory = false;
     private string currentUserId;
@@ -222,12 +222,13 @@ else
         isLoading = true;
 
         // Sprawdź uprawnienia
+       /*
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
 
         isAuditor = user.IsInRole("Audytor");
         currentUserId = user.FindFirst(c => c.Type == "sub")?.Value;
-
+        */
         await LoadQuestionnaireDataAsync();
 
         isLoading = false;

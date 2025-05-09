@@ -264,7 +264,7 @@ else
     [Parameter] public int InstanceId { get; set; }
 
     private bool isLoading = true;
-    private bool isAuditor = false;
+    private bool isAuditor = true; //Do dema
     private string currentUserId;
     private string errorMessage = "";
     private CompPlatformInstance instance;
@@ -278,12 +278,12 @@ else
     {
         isLoading = true;
 
-        // Sprawdź uprawnienia
-        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
+        // Sprawdź uprawnienia - do Dema uproszczenie
+        //var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        //var user = authState.User;
 
-        isAuditor = user.IsInRole("Audytor");
-        currentUserId = user.FindFirst(c => c.Type == "sub")?.Value;
+        //isAuditor = user.IsInRole("Audytor");
+        //currentUserId = user.FindFirst(c => c.Type == "sub")?.Value;
 
         if (isAuditor)
         {

@@ -132,7 +132,7 @@ else
 
 @code {
     private bool isLoading = true;
-    private bool isAuditor = false;
+    private bool isAuditor = true; //Do dema
     private string currentUserId;
     private List<ToolWithInstance> tools = new();
     private string selectedStatus = "";
@@ -142,13 +142,13 @@ else
     {
         isLoading = true;
 
-        // Pobierz użytkownika i rolę
-        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
+        // Pobierz użytkownika i rolę - do dema blokowanie
+        //var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        //var user = authState.User;
 
         // Sprawdź użytkownika
-        isAuditor = user.IsInRole("Audytor");
-        currentUserId = user.FindFirst(c => c.Type == "sub")?.Value;
+        //isAuditor = user.IsInRole("Audytor");
+        //currentUserId = user.FindFirst(c => c.Type == "sub")?.Value;
 
         // Załaduj bazując na roli
         await LoadToolsAsync();

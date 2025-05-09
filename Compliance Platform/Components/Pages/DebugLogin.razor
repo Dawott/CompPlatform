@@ -1,0 +1,61 @@
+﻿@page "/minimal-login"
+@using Microsoft.AspNetCore.Identity
+@using Compliance_Platform.Model
+@using System.ComponentModel.DataAnnotations
+@rendermode InteractiveServer
+@inject SignInManager<CompPlatformUser> SignInManager
+@inject NavigationManager NavigationManager
+@inject ILogger<Login> Logger 
+
+<h3>Minimal Login</h3>
+<EditForm Model="@loginModel" OnValidSubmit="AttemptLogin">
+    <DataAnnotationsValidator />
+    <p>Email: <InputText @bind-Value="loginModel.Email" /></p>
+    <p>Password: <InputText @bind-Value="loginModel.Password" type="password" /></p>
+    <button type="submit">Login</button>
+</EditForm>
+
+@code {
+    public class MinimalLoginModel
+    {
+        [Required] 
+        public string Email { get; set; } = "";
+        [Required] 
+        public string Password { get; set; } = "";
+    }
+    private MinimalLoginModel loginModel = new();
+
+    private async Task AttemptLogin()
+    {
+        Logger.LogInformation("MinimalLogin: Próba logowania dla {Email}", loginModel.Email);
+        //var signInTask = SignInManager.PasswordSignInAsync(loginModel.Email, loginModel.Password, false, false);
+
+        //await Task.Yield();
+
+        //Microsoft.AspNetCore.Identity.SignInResult result;
+        try
+        {
+            // Sprawdź, czy odpowiedź już się zaczęła (opcjonalnie, jak w punkcie 1)
+            //if (HttpContextAccessor.HttpContext?.Response.HasStarted ?? false) {
+            //     Logger.LogWarning("MinimalLogin: ODPOWIEDŹ JUŻ ROZPOCZĘTA!");
+            // }
+            //result = await signInTask;
+            var result = await SignInManager.PasswordSignInAsync(loginModel.Email, loginModel.Password, false, false);
+            Logger.LogInformation("MinimalLogin: Wynik logowania dla {Email}: {Succeeded}", loginModel.Email, result.Succeeded);
+
+            if (result.Succeeded)
+            {
+                Logger.LogInformation("MinimalLogin: Sukces, nawigacja do /");
+                NavigationManager.NavigateTo("/", forceLoad: true);
+            }
+            else
+            {
+                Logger.LogWarning("MinimalLogin: Logowanie nie powiodło się.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "MinimalLogin: Wyjątek podczas logowania {Email}", loginModel.Email);
+        }
+    }
+}

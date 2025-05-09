@@ -22,6 +22,14 @@ builder.Services.AddDbContext<CompPlatformDbContext>((options) =>
     options.UseSqlServer(dbConnectionsString);
 });
 
+builder.Services.AddRazorPages();
+builder.Services.AddServerSideBlazor();
+/*
+builder.Services.AddHttpClient("LocalAPI", client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["BaseAddress"] ?? builder.Configuration.GetSection("AppSettings")["BaseUrl"] ?? "https://localhost:5001/");
+});*/
+
 //Fragment do obs³ugi kont
 builder.Services.AddIdentity<CompPlatformUser, IdentityRole>(options => {
     options.SignIn.RequireConfirmedAccount = false; // TBD

@@ -158,13 +158,15 @@ else
                     <a href="/register-tool" class="btn btn-primary">
                             <i class="bi bi-plus-circle"></i> Zarejestruj nowe narzędzie
                         </a>
-                        
-                        @if (isAuditor)
+                        <a href="/question-management" class="btn btn-secondary">
+                            <i class="bi bi-gear"></i> Zarządzaj pytaniami
+                        </a>
+                       @* @if (isAuditor)
                         {
                             <a href="/question-management" class="btn btn-secondary">
                                 <i class="bi bi-gear"></i> Zarządzaj pytaniami
                             </a>
-                        }
+                        }*@
                         
                         <a href="/tools" class="btn btn-outline-primary">
                             <i class="bi bi-list-check"></i> Zarządzaj portfolio
@@ -266,6 +268,8 @@ else
         // Pobierz narzędzia
         List<CompPlatformTool> tools;
 
+        tools = await Repository.GetAllToolsAsync();
+        /*
         if (isAuditor)
         {
             tools = await Repository.GetAllToolsAsync();
@@ -274,7 +278,7 @@ else
         {
             tools = await Repository.GetToolsByOwnerAsync(currentUserId);
         }
-
+        */
         toolsCount = tools.Count;
 
         // Ostatnio dodane narzędzia (maksymalnie 5)
