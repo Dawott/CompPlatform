@@ -8,8 +8,8 @@
 @inject SignInManager<CompPlatformUser> SignInManager
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthStateProvider
-@*@rendermode InteractiveServer*@
-
+@inject ILogger<Login> Logger
+@rendermode InteractiveServer
 
 <PageTitle>Logowanie</PageTitle>
 
@@ -19,19 +19,19 @@
             <div class="card-header bg-primary text-white rounded-top-lg">
                 <h3>Logowanie</h3>
             </div>
-            <div class="card-body p-4">
-                @if(editContext != null)
-                {
-                <EditForm EditContext="@editContext" OnValidSubmit="@HandleValidFormSubmit" OnInvalidSubmit="@HandleInvalidFormSubmit" @*@onsubmit:preventDefault*@ FormName="LoginForm">
-                        
-                    
+            <div class="card-body p-4">       
+                <EditForm Model="@loginModel" OnValidSubmit="@HandleValidFormSubmit" OnInvalidSubmit="@HandleInvalidFormSubmit" FormName="LoginForm">
+                                          
                     <DataAnnotationsValidator />
-                    @* <ValidationSummary /> *@
+                    <ValidationSummary />
 
-                    @if (!string.IsNullOrEmpty(errorMessage))
+                    @if (loginErrors.Any())
                     {
                         <div class="alert alert-danger my-3" role="alert">
-                            @((MarkupString)errorMessage.Replace(";", "<br/>"))
+                                @foreach (var error in loginErrors)
+                                {
+                                    <p class="mb-0">@error</p>
+                                }
                         </div>
                     }
 
@@ -60,12 +60,7 @@
                         </div>
                     
                     </EditForm>
-                }
-                else
-                {
-                    <p>Inicjalizacja formularza...</p>
-                }
-
+                
                 <div class="mt-4 text-center">
                     <p>Nie masz konta? <a href="/register" class="text-primary">Zarejestruj!</a></p>
                 </div>
@@ -79,7 +74,6 @@
         </div>
     </div>
 </div>
-
 
 @code {
     public class LoginModel
@@ -96,13 +90,13 @@
 
     private LoginModel loginModel = new();
     private string errorMessage = string.Empty;
-    private EditContext? editContext;
+    //private EditContext? editContext;
     private bool isProcessing = false;
     private int loginModelHashCodeOnInit;
+    private List<string> loginErrors = new();
 
     protected override void OnInitialized()
     {
-        editContext = new EditContext(loginModel);
         base.OnInitialized();
         loginModelHashCodeOnInit = loginModel.GetHashCode();
         Console.WriteLine($"Login.OnInitialized: Model HashCode: {loginModelHashCodeOnInit}. Email on init: '{loginModel.Email}'");
@@ -110,186 +104,113 @@
 
     private async Task HandleValidFormSubmit()
     {
-        Console.WriteLine($"HandleValidFormSubmit. Email w modelu: '{loginModel.Email}', Hasło: '{(!string.IsNullOrEmpty(loginModel.Password) ? "Podane" : "Brak")}'");
-        Console.WriteLine($"Login.HandleValidFormSubmit: Current Model HashCode: {loginModel.GetHashCode()} (Initial was: {loginModelHashCodeOnInit})");
-        
-        if (loginModel.GetHashCode() != loginModelHashCodeOnInit)
-        {
-            Console.WriteLine("Login.HandleValidFormSubmit: WARNING - Model instance has changed since initialization!");
-        }
-        
-        errorMessage = string.Empty;
+        Logger.LogWarning("====== HandleValidFormSubmit WYWOŁANE ======");
+        Logger.LogInformation("HandleValidFormSubmit Start. Email: '{Email}', Posiada hasło: {HasPassword}", loginModel.Email, !string.IsNullOrEmpty(loginModel.Password));
+        Logger.LogDebug("Current Model HashCode: {CurrentHash} (Initial was: {InitialHash})", loginModel.GetHashCode(), loginModelHashCodeOnInit);
+        loginErrors.Clear();
         await HandleLogin();
     }
 
-    private void HandleInvalidFormSubmit()
+    private void HandleInvalidFormSubmit(EditContext context)
     {
-        Console.WriteLine($"HandleInvalidFormSubmit. Email w modelu: '{loginModel.Email}', Hasło: '{(!string.IsNullOrEmpty(loginModel.Password) ? "Podane" : "Brak")}'");
-        Console.WriteLine($"Login.HandleInvalidFormSubmit: Current Model HashCode: {loginModel.GetHashCode()} (Initial was: {loginModelHashCodeOnInit})");
-
-        if (loginModel.GetHashCode() != loginModelHashCodeOnInit)
-        {
-            Console.WriteLine("Login.HandleInvalidFormSubmit: WARNING - Model instance has changed since initialization!");
-        }
-
-        var validationMessages = editContext?.GetValidationMessages()?.ToList() ?? new List<string>();
+        var validationMessages = context.GetValidationMessages(); // Pobierz wszystkie komunikaty walidacyjne
         if (validationMessages.Any())
         {
-            errorMessage = string.Join("; ", validationMessages);
-            Console.WriteLine("Błędy walidacji:");
-            foreach (var msg in validationMessages)
+            Logger.LogWarning("Wykryto następujące błędy walidacji:");
+            foreach (var message in validationMessages)
             {
-                Console.WriteLine($"- {msg}");
+                Logger.LogWarning("- {ValidationMessage}", message); // Loguj każdy komunikat
+                loginErrors.Add(message); // Dodaj do listy, aby wyświetlić w UI
             }
         }
         else
         {
-            
-            errorMessage = "Sprawdź wprowadzone dane. Formularz zawiera błędy.";
-            Console.WriteLine("Walidacja nie powiodła się, ale nie znaleziono konkretnych komunikatów (sprawdź model).");
+            Logger.LogWarning("HandleInvalidFormSubmit wywołane, ale GetValidationMessages() nie zwróciło błędów. Model może być nieprawidłowy z innego powodu.");
+            loginErrors.Add("Formularz zawiera nieokreślone błędy walidacji.");
         }
         StateHasChanged();
     }
 
-        /*
-        private async Task HandleFormSubmit(EditContext context)
-        {
-        Console.WriteLine($"Formularz wysłany {loginModel.Email}");
-        errorMessage = string.Empty;
-
-        // Walidacja
-        bool isValid = context.Validate();
-        Console.WriteLine($"Walidacja: {(isValid ? "Poprawna" : "Niepoprawna")}");
-
-            if (isValid)
-        {
-        Console.WriteLine("Walidacja udana");
-            await HandleLogin();
-            }
-            else
-            {
-            Console.WriteLine("Walidacja nieudana");
-            var validationMessages = context.GetValidationMessages().ToList();
-                if (validationMessages.Any())
-                {
-                errorMessage = string.Join("; ", validationMessages);
-                Console.WriteLine("Błędy walidacji: ");
-                foreach (var message in validationMessages)
-                    {
-                Console.WriteLine($"Błąd: {message}");
-            }
-            }
-                else
-                {
-                errorMessage = "Sprawdź formularz";
-                Console.WriteLine("Walidacja nie powiodła się, ale nie znaleziono konkretnych komunikatów.");
-            }
-            StateHasChanged();
-    }
-    }
-    */
     private async Task HandleLogin()
     {
-        Console.WriteLine($"Rozpoczęcie logowania dla użytkownika: {loginModel.Email} Model HashCode: {loginModel.GetHashCode()}");
+        Logger.LogWarning("====== HandleLogin WYWOŁANE ======");
         isProcessing = true;
         StateHasChanged();
+        Logger.LogInformation("Próba logowania użytkownika: {Email}", loginModel.Email);
 
-        try{
-        if (string.IsNullOrEmpty(loginModel.Email) || string.IsNullOrEmpty(loginModel.Password))
+        try
         {
-            Console.WriteLine("Login.HandleLoginAttempt: Email or Password is null/empty before calling SignInManager. This should have been caught by validation.");
-            errorMessage = "Email i hasło nie mogą być puste.";
-            isProcessing = false;
-            StateHasChanged();
-            return;
-        }
+            // Email jako nazwy użytkownika do logowania
+            var result = await SignInManager.PasswordSignInAsync(loginModel.Email, loginModel.Password, loginModel.RememberMe, lockoutOnFailure: true);
 
-            var result = await SignInManager.PasswordSignInAsync(
-                loginModel.Email,
-                loginModel.Password,
-                loginModel.RememberMe,
-                lockoutOnFailure: false);
+            Logger.LogInformation("Wynik logowania dla {Email}: Powodzenie={Succeeded}, Zablokowany={IsLockedOut}, Niedozwolony={IsNotAllowed}",
+                loginModel.Email, result.Succeeded, result.IsLockedOut, result.IsNotAllowed);
 
             if (result.Succeeded)
             {
-                Console.WriteLine("Logowanie powiodło się. Przekierowanie...");
-                NavigationManager.NavigateTo("/");
+                Logger.LogInformation("Logowanie użytkownika {Email} zakończone sukcesem.", loginModel.Email);
+                NavigationManager.NavigateTo("/", forceLoad: true); // (forceLoad może pomóc odświeżyć stan autoryzacji)
             }
-            else
+            else if (result.IsLockedOut)
             {
-                Console.WriteLine($"Logowanie nie powiodło się. Rezultat: {result}");
-                errorMessage = "Błąd logowania!";
-                if (result.IsLockedOut)
-                {
-                    errorMessage = "Konto jest tymczasowo zablokowane.";
-                }
-                else if (result.IsNotAllowed)
-                {
-                    errorMessage = "Logowanie nie jest dozwolone. Skontaktuj się z administratorem (np. email niepotwierdzony).";
-                }
-
-
+                Logger.LogWarning("Konto użytkownika {Email} jest zablokowane.", loginModel.Email);
+                loginErrors.Add("Twoje konto jest tymczasowo zablokowane z powodu zbyt wielu nieudanych prób logowania.");
+            }
+            else if (result.IsNotAllowed)
+            {
+                Logger.LogWarning("Logowanie niedozwolone dla użytkownika {Email} (np. brak potwierdzenia email).", loginModel.Email);
+                loginErrors.Add("Logowanie nie jest możliwe. Czy potwierdziłeś swój adres email?"); // Dostosuj komunikat
+            }
+            else // Inne błędy (np. błędne hasło/email)
+            {
+                Logger.LogWarning("Nieudana próba logowania dla użytkownika {Email}.", loginModel.Email);
+                loginErrors.Add("Nieprawidłowy email lub hasło.");
             }
         }
         catch (Exception ex)
         {
-            errorMessage = $"Błąd: {ex.Message}";
-            Console.WriteLine(ex);
+            Logger.LogError(ex, "Wystąpił nieoczekiwany wyjątek podczas próby logowania użytkownika {Email}", loginModel.Email);
+            loginErrors.Add($"Wystąpił krytyczny błąd serwera: {ex.GetType().Name}. Spróbuj ponownie później.");
         }
         finally
         {
-            isProcessing = false;
-            StateHasChanged();
+            isProcessing = false; // Odblokuj formularz
+            StateHasChanged(); 
         }
     }
 
     private async Task DemoAdminLogin()
     {
-        Console.WriteLine("Próba logowania demonstracyjnego jako Admin.");
-        // Pre-fill
-        loginModel.Email = "admin@example.com";
-        loginModel.Password = "Admin123!";
-        loginModel.RememberMe = true;
-
-        if (editContext != null) 
+        loginErrors.Clear();
+        Logger.LogInformation("Próba logowania demo jako Admin");
+        isProcessing = true;
+        try
         {
-            // Potwierdzenie, że editContext jest zainicjowany
-            editContext.NotifyValidationStateChanged();
+        // Pre-fill na potrzeby dema - NIE NA PROD
+        var demoEmail = "admin@example.com";
+        var demoPassword = "Admin123!";        
 
-            // Login attempt
-            Console.WriteLine($"Dane demo załadowane: Email='{loginModel.Email}'. Walidacja...");
-            if (editContext.Validate())
+        var result = await SignInManager.PasswordSignInAsync(demoEmail, demoPassword, isPersistent: false, lockoutOnFailure: false);
+
+            if (result.Succeeded)
             {
-                Console.WriteLine("Walidacja danych demo zakończona sukcesem.");
-                await HandleValidFormSubmit();
+                Logger.LogInformation("Logowanie demo jako Admin zakończone sukcesem.");
+                NavigationManager.NavigateTo("/", forceLoad: true);
             }
             else
             {
-                errorMessage = "Wystąpił problem z danymi demonstracyjnymi.";
-                var validationMessages = editContext.GetValidationMessages().ToList();
-                if (validationMessages.Any())
-                {
-                    errorMessage = string.Join("; ", validationMessages);
-                    Console.WriteLine("Błędy walidacji danych demo:");
-                    foreach (var msg in validationMessages)
-                    {
-                        Console.WriteLine($"- {msg}");
-                    }
-                }
-                HandleInvalidFormSubmit();
-                Console.WriteLine("Walidacja danych demo nie powiodła się.");
+                Logger.LogError("Nieudana próba logowania demo jako Admin. Result: {SignInResult}", result.ToString());
+                loginErrors.Add("Logowanie demo nie powiodło się. Sprawdź konfigurację konta demo.");
             }
         }
-        else
+        catch (Exception ex)
         {
-            Console.WriteLine("Błąd: EditContext nie został zainicjalizowany przed logowaniem demo.");
-            errorMessage = "Błąd inicjalizacji formularza.";
-            StateHasChanged();
+            Logger.LogError(ex, "Wystąpił nieoczekiwany wyjątek podczas logowania demo");
+            loginErrors.Add($"Wystąpił krytyczny błąd serwera podczas logowania demo: {ex.GetType().Name}.");
         }
-    }
-
-
-    
-    
-    
+        finally
+        {
+            isProcessing = false;
+        }
+    } 
 }
