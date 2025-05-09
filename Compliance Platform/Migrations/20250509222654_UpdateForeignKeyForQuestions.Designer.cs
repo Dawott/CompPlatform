@@ -4,6 +4,7 @@ using Compliance_Platform.Model;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Compliance_Platform.Migrations
 {
     [DbContext(typeof(CompPlatformDbContext))]
-    partial class CompPlatformDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250509222654_UpdateForeignKeyForQuestions")]
+    partial class UpdateForeignKeyForQuestions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -36,6 +39,9 @@ namespace Compliance_Platform.Migrations
                     b.Property<int>("QuestionTemplateId")
                         .HasColumnType("int");
 
+                    b.Property<int>("QuestionsId")
+                        .HasColumnType("int");
+
                     b.Property<string>("Treść")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -45,7 +51,7 @@ namespace Compliance_Platform.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("QuestionTemplateId");
+                    b.HasIndex("QuestionsId");
 
                     b.ToTable("Answers");
                 });
@@ -527,7 +533,7 @@ namespace Compliance_Platform.Migrations
                 {
                     b.HasOne("Compliance_Platform.Model.CompPlatformQuestions", "Questions")
                         .WithMany("Answers")
-                        .HasForeignKey("QuestionTemplateId")
+                        .HasForeignKey("QuestionsId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

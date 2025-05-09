@@ -58,6 +58,20 @@ namespace Compliance_Platform.Model
                 .WithMany()
                 .HasForeignKey(h => h.AuditorId)
                 .OnDelete(DeleteBehavior.NoAction);
+            modelBuilder.Entity<CompPlatformQuestions>(entity =>
+            {
+                entity.HasOne(q => q.Questionnaires) 
+                      .WithMany(p => p.Questions)  
+                      .HasForeignKey(q => q.QuestionnaireId) 
+                      .OnDelete(DeleteBehavior.Cascade); 
+            });
+            modelBuilder.Entity<CompPlatformAnswers>(entity =>
+            {
+                entity.HasOne(a => a.Questions)
+                      .WithMany(q => q.Answers)  
+                      .HasForeignKey(a => a.QuestionTemplateId) 
+                      .OnDelete(DeleteBehavior.Cascade);
+            });
         }
     }
 }

@@ -110,7 +110,7 @@ else
                                 <tr>
                                     <td>@question.OrderIndex</td>
                                     <td>@(question.Tresc?.Length > 50 ? question.Tresc?.Substring(0, 47) + "..." : question.Tresc)</td>
-                                    <td>@GetQuestionnaireName(question.QuestionnaireId)</td>
+                                    <!--<td>@GetQuestionnaireName(question.QuestionnaireId)</td>-->
                                     <td>@GetCategoryDisplayName(question.Kategoria)</td>
                                     <td>@question.TypPytania</td>
                                     <td>@question.WagaRyzyka.ToString("F2")</td>
@@ -127,13 +127,13 @@ else
                                     <td>
                                         <div class="btn-group" role="group">
                                             <button class="btn btn-sm btn-info" @onclick="() => ShowQuestionModal(question)">
-                                                <i class="bi bi-pencil"></i>
+                                                <i class="bi bi-pencil">Pokaż</i>
                                             </button>
                                             <button class="btn btn-sm btn-danger" @onclick="() => ShowDeleteConfirmation(question)">
-                                                <i class="bi bi-trash"></i>
+                                                <i class="bi bi-trash">Usuń</i>
                                             </button>
                                             <button class="btn btn-sm btn-success" @onclick="() => ShowAnswersModal(question)">
-                                                <i class="bi bi-list-check"></i> Odpowiedzi
+                                                <i class="bi bi-list-check">Odpowiedzi</i>
                                             </button>
                                         </div>
                                     </td>
@@ -355,19 +355,19 @@ else
                                                         @if (editingAnswerId == answer.Id)
                                                         {
                                                             <button class="btn btn-sm btn-success me-1" @onclick="() => SaveAnswer(answer)">
-                                                                <i class="bi bi-check"></i>
+                                                                <i class="bi bi-check">Zapisz</i>
                                                             </button>
                                                             <button class="btn btn-sm btn-secondary" @onclick="CancelEditAnswer">
-                                                                <i class="bi bi-x"></i>
+                                                                <i class="bi bi-x">Anuluj</i>
                                                             </button>
                                                         }
                                                         else
                                                         {
                                                             <button class="btn btn-sm btn-info me-1" @onclick="() => EditAnswer(answer.Id)">
-                                                                <i class="bi bi-pencil"></i>
+                                                                <i class="bi bi-pencil">Edytuj</i>
                                                             </button>
                                                             <button class="btn btn-sm btn-danger" @onclick="() => DeleteAnswer(answer.Id)">
-                                                                <i class="bi bi-trash"></i>
+                                                                <i class="bi bi-trash">Usuń</i>
                                                             </button>
                                                         }
                                                     </td>
